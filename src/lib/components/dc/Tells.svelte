@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Filters } from '#lib/filters.ts';
 	import { pct } from '#lib/format.ts';
-	import { describe, loadTells, MIN_GAP, MIN_PLAYS } from '#lib/tells.ts';
+	import { describe, loadTells, MIN_GAP, SHRINK_PLAYS } from '#lib/tells.ts';
 	import DataNote from '../DataNote.svelte';
 	import Loader from '../Loader.svelte';
 
@@ -11,28 +11,30 @@
 <section class="card view">
 	<h2>Tells</h2>
 	<p class="muted">
-		Where their run/pass mix is most predictable compared to the league in the same situation (at
-		least {MIN_PLAYS} plays and {pct(MIN_GAP)} apart).
+		Where their run/pass mix is most predictable compared to the league in the same situation. Each
+		rate is blended with {SHRINK_PLAYS} league-average plays, so a short streak can't pass for a habit.
+		Shown when at least {Math.round(MIN_GAP * 100)} points from the league.
 	</p>
 	<DataNote seasons={filters.seasons} what="Personnel tells" />
 	<Loader {filters} load={loadTells}>
 		{#snippet children(tells)}
 			{#if tells.length === 0}
-				<p class="muted">Nothing stands out under these filters.</p>
+				<p class="muted">Nothing stands out under these filters. Small samples rarely do: try adding the previous season.</p>
 			{:else}
 				<ol>
 					{#each tells as t (describe(t))}
 						<!-- Phrase each tell in the direction it leans compared to the league. -->
-						{@const pass = t.passRate > t.leaguePassRate}
+						{@const pass = t.expected > t.leaguePassRate}
 						<li>
 							<span class="when">{describe(t)}</span>
 							<span class="arrow">→</span>
 							<strong class:pass class:run={!pass}>
-								{pass ? 'pass' : 'run'}
-								{pct(pass ? t.passRate : 1 - t.passRate)}
+								expect {pass ? 'pass' : 'run'}
+								{pct(pass ? t.expected : 1 - t.expected)}
 							</strong>
 							<span class="muted">
-								league {pct(pass ? t.leaguePassRate : 1 - t.leaguePassRate)} · n={t.n}
+								league {pct(pass ? t.leaguePassRate : 1 - t.leaguePassRate)} · raw
+								{pct(pass ? t.passRate : 1 - t.passRate)} on n={t.n}
 							</span>
 						</li>
 					{/each}

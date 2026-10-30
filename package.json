@@ -15,6 +15,7 @@
 		"data:setup": "python3 -m venv pipeline/.venv && pipeline/.venv/bin/pip install -r pipeline/requirements.txt",
 		"data": "pipeline/.venv/bin/python pipeline/build.py",
 		"data:test": "cd pipeline && .venv/bin/python -m pytest -q",
+		"data:backtest": "pipeline/.venv/bin/python pipeline/tells_backtest.py",
 		"test": "vitest run"
 	},
 	"devDependencies": {

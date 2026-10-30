@@ -33,14 +33,26 @@ export const SETS: Dim[][] = [
 export interface Tell {
 	dims: Partial<Record<Dim, string>>;
 	n: number;
+	/** The team's raw pass rate in this situation. */
 	passRate: number;
+	/** The raw rate pulled toward the league: what to expect next time. */
+	expected: number;
 	leaguePassRate: number;
-	/** Standard score of the team rate against the league rate at this n. */
-	z: number;
 }
 
 export const MIN_PLAYS = 12;
-export const MIN_GAP = 0.12;
+/**
+ * Shrinkage strength: the team rate is blended with this many league-average
+ * plays. Fitted by pipeline/tells_backtest.py (tells from weeks 1-9 predicting
+ * weeks 10-18): 75, 65 and 90 for 2023-2025. Without it, the 2023-2025 tells
+ * kept only 32-44% of their gap in the second half; with it, 79-105%.
+ */
+export const SHRINK_PLAYS = 90;
+/** Minimum gap between the expected rate and the league rate. */
+export const MIN_GAP = 0.05;
+
+export const shrink = (n: number, rate: number, league: number) =>
+	(n * rate + SHRINK_PLAYS * league) / (n + SHRINK_PLAYS);
 
 export function tellsSql(f: Filters): string {
 	const cols = DIMS.map((d) => `${DIM_EXPR[d]}::VARCHAR AS ${d}`).join(', ');
@@ -76,25 +88,29 @@ export function pickTells(rows: Row[], limit = 8): Tell[] {
 		const dims = dimsOf(r.gid);
 		// A NULL inside a grouped dim means missing data (e.g. no personnel), not "all".
 		if (dims.some((d) => r[d] === null)) continue;
-		if (Math.abs(r.p - r.lp) < MIN_GAP) continue;
-		const se = Math.sqrt(Math.max(r.lp * (1 - r.lp), 0.01) / r.n);
+		const expected = shrink(r.n, r.p, r.lp);
+		if (Math.abs(expected - r.lp) < MIN_GAP) continue;
 		candidates.push({
 			dims: Object.fromEntries(dims.map((d) => [d, r[d]!])),
 			n: r.n,
 			passRate: r.p,
-			leaguePassRate: r.lp,
-			z: (r.p - r.lp) / se
+			expected,
+			leaguePassRate: r.lp
 		});
 	}
-	candidates.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+	// Rank by the expected gap: big samples with moderate gaps beat tiny
+	// samples with extreme ones, which mostly regress.
+	const gap = (t: Tell) => t.expected - t.leaguePassRate;
+	candidates.sort((a, b) => Math.abs(gap(b)) - Math.abs(gap(a)));
 
-	// Skip a tell that only narrows an already chosen one in the same direction.
+	// Skip a tell that narrows or widens an already chosen one in the same
+	// direction ("1st down" and "1st & 7-10" are the same tell said twice).
+	const within = (a: Tell, b: Tell) =>
+		Object.entries(a.dims).every(([k, v]) => b.dims[k as Dim] === v);
 	const chosen: Tell[] = [];
 	for (const c of candidates) {
 		const redundant = chosen.some(
-			(p) =>
-				Math.sign(p.z) === Math.sign(c.z) &&
-				Object.entries(p.dims).every(([k, v]) => c.dims[k as Dim] === v)
+			(p) => Math.sign(gap(p)) === Math.sign(gap(c)) && (within(p, c) || within(c, p))
 		);
 		if (!redundant) chosen.push(c);
 		if (chosen.length === limit) break;

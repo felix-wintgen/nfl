@@ -23,6 +23,8 @@ The build exits non-zero when a sanity check fails (low join rates, too few play
 
 Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-downloads cached files.
 
+`npm run data:backtest -- 2023 2024 2025` checks whether the DC helper's tells hold up: it picks them from weeks 1–9 and compares them with weeks 10–18. It also fits `SHRINK_PLAYS` in `src/lib/tells.ts`; rerun it once a season is complete.
+
 ## Known data gaps
 
 - NGS participation (personnel, formation, coverage, routes, pressure) is not published for the current season yet; those columns are NULL for 2026.
