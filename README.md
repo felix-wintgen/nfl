@@ -1,0 +1,33 @@
+# NFL Scout
+
+Opponent-scouting tools built on [nflverse](https://github.com/nflverse) data: a **DC helper** (scout the opposing offense) and an **OC helper** (scout the opposing defense). It's a static SvelteKit site, with DuckDB-WASM querying parquet files in the browser. See [PLAN.md](PLAN.md).
+
+## Setup
+
+Requires Node and Python 3.9+.
+
+```sh
+npm install
+npm run data:setup   # pipeline venv (duckdb, pytest)
+npm run data         # download nflverse files, write static/data/
+npm run dev
+```
+
+## Data pipeline
+
+`pipeline/build.py` downloads play-by-play, NGS participation and FTN charting from the nflverse-data releases. It caches them in `pipeline/.cache`, joins them per play, and writes one slim `static/data/plays_{season}.parquet` per season. It also writes `teams.json`, `games.json` and `manifest.json`.
+
+The derived columns (personnel grouping, defensive package, distance bucket, field zone …) are DuckDB macros in `pipeline/derive.py`, tested in `pipeline/tests/` (`npm run data:test`).
+
+The build exits non-zero when a sanity check fails (low join rates, too few plays for a full season).
+
+Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-downloads cached files.
+
+## Known data gaps
+
+- NGS participation (personnel, formation, coverage, routes, pressure) is not published for the current season yet; those columns are NULL for 2026.
+- Coverage type is filled on ~55–60% of plays, routes on ~40%.
+
+## License / attribution
+
+The NFL data belongs to its respective owners. The nflverse data comes with its own terms (FTN charting requires attribution).
