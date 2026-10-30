@@ -115,8 +115,10 @@ export const teamColumn = (side: Side) => (side === 'offense' ? 'posteam' : 'def
 
 /**
  * Situation conditions shared by the team and the league baseline: seasons,
- * season type, down, distance, zone, score, clock. `venue` is relative to the
- * scouted side, so it is applied here too (home offense vs. home defense).
+ * season type, down, distance, zone, score, clock, games window. `venue` is
+ * relative to the scouted side, so it is applied here too (home offense vs.
+ * home defense). The games window keeps every team's own last N games, so the
+ * league and the per-team ranks use the same window as the scouted team.
  */
 export function situationWhere(f: Filters, side: Side): string[] {
 	const w: string[] = [];
@@ -133,25 +135,34 @@ export function situationWhere(f: Filters, side: Side): string[] {
 		const offenseHome = (f.venue === 'home') === (side === 'offense');
 		w.push(offenseHome ? 'is_home' : 'NOT is_home');
 	}
+	if (f.games !== 'all') w.push(gamesWindow(f, side));
 	return w;
 }
 
-/** Situation conditions plus the scouted team and its games window. */
+/**
+ * Keeps a play when its game is among the last N games of the play's team on
+ * the scouted side. Only seasons and season type scope the games, so "last 4
+ * games" means games, not games with a red-zone snap.
+ */
+function gamesWindow(f: Filters, side: Side): string {
+	const n = f.games === 'last4' ? 4 : 8;
+	const scope: string[] = [];
+	if (f.seasons.length) scope.push(inList('season', f.seasons));
+	if (f.seasonType !== 'all') scope.push(`season_type = ${str(f.seasonType)}`);
+	const w = where(scope);
+	// game_id is "YYYY_WW_AWAY_HOME", so it sorts chronologically.
+	return (
+		`${teamColumn(side)} || ' ' || game_id IN (SELECT team || ' ' || game_id FROM (` +
+		`SELECT posteam AS team, game_id FROM plays ${w} UNION ` +
+		`SELECT defteam AS team, game_id FROM plays ${w}) ` +
+		`QUALIFY row_number() OVER (PARTITION BY team ORDER BY game_id DESC) <= ${n})`
+	);
+}
+
+/** Situation conditions (games window included) plus the scouted team. */
 export function teamWhere(f: Filters, side: Side): string[] {
 	if (!f.team || !TEAM_RE.test(f.team)) throw new Error(`invalid team: ${f.team}`);
-	const w = [`${teamColumn(side)} = ${str(f.team)}`, ...situationWhere(f, side)];
-	if (f.games !== 'all') {
-		const n = f.games === 'last4' ? 4 : 8;
-		const scope = [`(posteam = ${str(f.team)} OR defteam = ${str(f.team)})`];
-		if (f.seasons.length) scope.push(inList('season', f.seasons));
-		if (f.seasonType !== 'all') scope.push(`season_type = ${str(f.seasonType)}`);
-		// game_id is "YYYY_WW_AWAY_HOME", so it sorts chronologically.
-		w.push(
-			`game_id IN (SELECT game_id FROM plays WHERE ${scope.join(' AND ')} ` +
-				`GROUP BY game_id ORDER BY game_id DESC LIMIT ${n})`
-		);
-	}
-	return w;
+	return [`${teamColumn(side)} = ${str(f.team)}`, ...situationWhere(f, side)];
 }
 
 export const where = (conds: string[]) => (conds.length ? `WHERE ${conds.join(' AND ')}` : '');

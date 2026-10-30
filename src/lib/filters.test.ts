@@ -92,6 +92,20 @@ describe('situationWhere', () => {
 		]);
 	});
 
+	it("gives every team its own games window, keyed by the scouted side's team", () => {
+		const off = situationWhere(withTeam({ games: 'last8' }), 'offense').at(-1)!;
+		const def = situationWhere(withTeam({ games: 'last8' }), 'defense').at(-1)!;
+		expect(off).toMatch(/^posteam \|\| ' ' \|\| game_id IN /);
+		expect(def).toMatch(/^defteam \|\| ' ' \|\| game_id IN /);
+		expect(off).toContain('<= 8');
+		// The window is about games, not the scouted team or the situation.
+		expect(off).not.toContain("'KC'");
+		expect(
+			situationWhere(withTeam({ games: 'last8', downs: [3] }), 'offense').at(-1)
+		).not.toContain('down');
+		expect(situationWhere(withTeam(), 'offense').join(' ')).not.toContain('game_id');
+	});
+
 	it('flips venue for the defense', () => {
 		expect(situationWhere(withTeam({ venue: 'home' }), 'offense')).toContain('is_home');
 		expect(situationWhere(withTeam({ venue: 'home' }), 'defense')).toContain('NOT is_home');
@@ -106,9 +120,10 @@ describe('teamWhere', () => {
 	});
 
 	it('limits to the last N games of the team', () => {
-		const w = teamWhere(withTeam({ games: 'last4' }), 'offense').at(-1)!;
-		expect(w).toContain("(posteam = 'KC' OR defteam = 'KC')");
-		expect(w).toContain('ORDER BY game_id DESC LIMIT 4');
+		const w = teamWhere(withTeam({ games: 'last4' }), 'offense');
+		expect(w[0]).toBe("posteam = 'KC'");
+		expect(w.at(-1)).toMatch(/^posteam \|\| ' ' \|\| game_id IN /);
+		expect(w.at(-1)).toContain('PARTITION BY team ORDER BY game_id DESC) <= 4');
 	});
 
 	it('rejects a missing or malformed team', () => {
