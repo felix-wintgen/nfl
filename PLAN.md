@@ -86,10 +86,85 @@ Browser
 | M5  | Nightly Action + Pages deploy + manifest "data as of" banner                                         | The public URL updates by itself after a game week                               |
 | M6  | Polish: game sheet print layout, mobile, dark mode, loading states, attribution                      | Lighthouse ≥ 90, works on phone                                                  |
 
-M1 and M2 can run in parallel once M0 is done.
+**Status (2026-10-30):** M0–M6 are done and live at https://felix-wintgen.github.io/nfl/. Lighthouse on the live site scores 95–100 for performance and 100 for accessibility, best practices and SEO. Still to confirm for M5: the first unattended daily refresh after a game week.
 
-## 5. Open points
+## 5. Resolved points
 
-- GitHub account/repo name for the public site.
-- How many seasons to ship. Proposal: 2022–current (~25 MB of data total), so FTN coverage lines up.
-- Whether to run a later v2 of matchup mode (my offense vs. their defense side by side).
+- Repo: `felix-wintgen/nfl` (public), deployed by GitHub Actions to Pages.
+- Seasons: 2022–current; the whole dataset is ~4 MB.
+- Matchup mode (my offense vs. their defense) is folded into the podcast mode below.
+
+## 6. Next: podcast mode
+
+A "next week in the NFL" mode that does what podcasters do (fill airtime with confident, mostly predictable takes), except every take is a checkable claim, graded automatically after the games, with a persona leaderboard. It's purely for fun: the goal is to beat them at their own game.
+
+### 6.1 Matchup edges
+
+Every game is two matchups: home offense vs. away defense, and the reverse. For each pairing, compare the offense's league percentile with the defense's on matching metrics:
+
+| Offense                                       | vs. defense                 |
+| --------------------------------------------- | --------------------------- |
+| Pass EPA / success                            | Pass EPA / success allowed  |
+| Run EPA, yards per carry by lane              | Same, allowed, by lane      |
+| Explosive rate                                | Explosive rate allowed      |
+| Pressure rate faced, time to throw            | Pressure rate, blitz rate   |
+| Production vs. man / zone, by coverage        | Man rate, coverage mix      |
+| 3rd-down conversion                           | 3rd-down conversion allowed |
+| Red-zone TD rate                              | Red-zone TD rate allowed    |
+| Pass rate over expected, early-down pass rate | Pass rate faced             |
+
+An **edge** is a large gap between the two percentiles (for example an offense in the top 5 in run EPA against a defense in the bottom 5). The biggest edges per game are what the personas talk about. The matchup page shows both pairings side by side, with the edges highlighted.
+
+Data: `schedules/games.parquet` already has next week's games plus `spread_line`, `total_line` and moneylines (checked: all 14 week-8 games have lines). Edges must use only plays from **before** that game's week, so backtests don't leak results.
+
+### 6.2 Personas
+
+A persona is a set of biases (which edges it weighs and how much) plus a voice. Proposed lineup, to be tuned:
+
+| Persona           | Bias                                                     | Voice                     |
+| ----------------- | -------------------------------------------------------- | ------------------------- |
+| The Analytics Bro | EPA, pass rate over expected, 4th-down aggressiveness    | "Just go for it."         |
+| Old-School Coach  | Run game, turnovers, defense, "physicality"              | "Establish the run."      |
+| The Vibes Guy     | Last 4 games only, streaks, narratives                   | "They just _feel_ hot."   |
+| The Contrarian    | Fades the biggest edge and the betting favorite          | "Everyone's sleeping on…" |
+| The Homer         | Always picks one fixed team (team TBD)                   | Unconditional             |
+| Captain Obvious   | Near-tautologies only ("the team with more points wins") | Confident                 |
+
+Captain Obvious is the control group. He'll probably top raw accuracy, which is why there's also a boldness score.
+
+### 6.3 Takes and grading
+
+Every take is a structured, checkable claim with a threshold, graded from play-by-play and the final score:
+
+- **Picks:** winner, against the spread, over/under (from the nflverse lines).
+- **Claims:** for example "DET runs 30+ times", "KC allows 3+ sacks", "both teams score 24+", "PHI goes for it on 4th down at least once", "QB X throws for 250+".
+- **Scores per persona:** winner accuracy, accuracy against the spread, claim accuracy, and **boldness**: claims weighted by how unlikely they were (base rate from the league). That way safe platitudes earn little.
+
+Take wording comes from per-persona templates filled in from the edge and the claim. An optional later step has Claude rewrite the wording in each persona's voice in the nightly Action (API key as a GitHub secret, a few cents per week). Picks and grading stay deterministic either way.
+
+### 6.4 Backtesting
+
+Run every persona over 2022–current, week by week, using only data from before each week. That gives a full leaderboard from day one. It doubles as a test: no persona should beat the spread by much over 4+ seasons, and if one does, look for leakage first.
+
+### 6.5 Freezing picks
+
+Picks for the upcoming week are generated in the daily Action and **committed** to the repo (`picks/{season}_{week}.json`, which needs `contents: write`). A week's file is never changed after its first kickoff. Grading reads the frozen file, so no persona can "update" a take after the fact.
+
+### 6.6 Milestones
+
+| #             | Milestone                                                                    | Done when                                                                           |
+| ------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| P1            | Edge engine: per-team percentiles as of a given week, both pairings per game | Edges for week 8 match hand-checked SQL; no plays from week ≥ N used for week N     |
+| P2            | Claim catalog + grader                                                       | Each claim type graded correctly on a few hand-checked past games                   |
+| P3            | Personas + templates (no LLM)                                                | Every persona produces picks and 3–5 takes per game                                 |
+| P4            | Backtest 2022–current + leaderboard page                                     | Leaderboard renders; results are sane (no persona far above 50% against the spread) |
+| P5            | Matchup page for the upcoming week                                           | All games of the week, both pairings, edges, persona takes                          |
+| P6            | Freezing picks in CI, weekly grading                                         | Next week's picks are committed before kickoff and graded automatically afterwards  |
+| P7 (optional) | Claude-written persona voice                                                 | Takes read like the persona; grading unchanged                                      |
+
+### 6.7 Open questions
+
+- Final persona lineup and names.
+- The Homer's team.
+- Picks against the spread and over/under, or winners only? (Proposal: all three. The lines are already in the data.)
+- Claude for the wording: from the start, later, or never?
