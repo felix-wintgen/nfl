@@ -5,7 +5,7 @@
 		key: string;
 		label: string;
 		expr: string;
-		format: 'pct' | 'pp' | 'epa';
+		format: 'pct' | 'pp' | 'epa' | 'num';
 		/** Which direction is good for the scouted unit; 'none' for pure tendencies. */
 		better: 'high' | 'low' | 'none';
 		/** Query options (e.g. the fourth_downs table); items sharing them run in one query. */
@@ -17,15 +17,22 @@
 <script lang="ts">
 	import { compare, type Compared } from '#lib/baseline.ts';
 	import type { Filters, Side } from '#lib/filters.ts';
-	import { epa, ordinal, pct, pp, SMALL_SAMPLE } from '#lib/format.ts';
+	import { epa, num, ordinal, pct, pp, SMALL_SAMPLE } from '#lib/format.ts';
 	import Loader from './Loader.svelte';
 
 	let {
 		filters,
 		side,
 		items,
-		title = 'Identity'
-	}: { filters: Filters; side: Side; items: IdentityItem[]; title?: string } = $props();
+		title = 'Identity',
+		subtitle = 'Ranks are among all 32 teams under the same filters.'
+	}: {
+		filters: Filters;
+		side: Side;
+		items: IdentityItem[];
+		title?: string;
+		subtitle?: string;
+	} = $props();
 
 	async function load(f: Filters): Promise<Record<string, Compared>> {
 		const groups = new Map<string, IdentityItem[]>();
@@ -42,7 +49,13 @@
 	}
 
 	const fmt = (i: IdentityItem, v: number | null) =>
-		i.format === 'pct' ? pct(v, 1) : i.format === 'pp' ? pp(v) : epa(v);
+		i.format === 'pct'
+			? pct(v, 1)
+			: i.format === 'pp'
+				? pp(v)
+				: i.format === 'num'
+					? num(v, 2)
+					: epa(v);
 
 	function rank(i: IdentityItem, c: Compared): { label: string; tone: string } {
 		if (c.rank === null) return { label: '', tone: '' };
@@ -57,7 +70,7 @@
 
 <section class="card view">
 	<h2>{title}</h2>
-	<p class="muted">Ranks are among all 32 teams under the same filters.</p>
+	<p class="muted">{subtitle}</p>
 	<Loader {filters} {load}>
 		{#snippet children(res)}
 			<div class="tiles">
@@ -76,6 +89,12 @@
 					{/if}
 				{/each}
 			</div>
+			{#if items.some((i) => res[i.key]?.value === null)}
+				<p class="foot">
+					– means no data under these filters. Pressure and coverage come from NGS participation
+					data, which nflverse hasn't published for every season yet.
+				</p>
+			{/if}
 		{/snippet}
 	</Loader>
 </section>

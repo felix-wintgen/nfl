@@ -148,3 +148,38 @@ export async function teamQuery<T>(
 	await ensureSeasons(f.seasons);
 	return query<T>(sql(where([...teamWhere(f, side), ...extra])));
 }
+
+/** Defense-side metric expressions over `plays`. */
+export const D = {
+	pressure: 'avg(is_pressure::INT) FILTER (WHERE is_pass)',
+	sack: 'avg(is_sack::INT) FILTER (WHERE is_pass)',
+	qbHit: 'avg(is_qb_hit::INT) FILTER (WHERE is_pass)',
+	blitz: 'avg(is_blitz::INT) FILTER (WHERE is_pass)',
+	rushers: 'avg(ftn_pass_rushers) FILTER (WHERE is_pass)',
+	man: "avg((man_zone = 'MAN_COVERAGE')::INT) FILTER (WHERE is_pass)",
+	boxRun: 'avg(ftn_box) FILTER (WHERE NOT is_pass)',
+	int: 'avg(is_int::INT) FILTER (WHERE is_pass)',
+	firstDown: 'avg(is_first_down::INT)',
+	td: 'avg(is_td::INT)',
+	comp: 'avg(is_complete::INT) FILTER (WHERE is_pass)'
+} as const;
+
+/** Coverage codes in a sensible reading order (man first, then zone shells). */
+export const COVERAGES = [
+	'COVER_0',
+	'COVER_1',
+	'2_MAN',
+	'COVER_2',
+	'COVER_3',
+	'COVER_4',
+	'COVER_6',
+	'COVER_9',
+	'COMBO',
+	'BLOWN'
+] as const;
+
+export function coverageLabel(code: string): string {
+	if (code === '2_MAN') return '2-Man';
+	if (code.startsWith('COVER_')) return `Cover ${code.slice(6)}`;
+	return code.charAt(0) + code.slice(1).toLowerCase();
+}

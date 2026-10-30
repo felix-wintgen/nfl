@@ -133,16 +133,16 @@ COPY (
 """
 
 PART_COLS = """
-        r.offense_formation AS formation,
+        nullif(r.offense_formation, '') AS formation,
         off_personnel(r.offense_personnel) AS off_personnel,
         def_package(r.defense_personnel) AS def_package,
         CAST(def_dbs(r.defense_personnel) AS TINYINT) AS def_dbs,
         CAST(r.defenders_in_box AS TINYINT) AS box,
         CAST(r.number_of_pass_rushers AS TINYINT) AS pass_rushers,
         r.was_pressure AS is_pressure,
-        r.defense_man_zone_type AS man_zone,
-        r.defense_coverage_type AS coverage,
-        r.route,
+        nullif(r.defense_man_zone_type, '') AS man_zone,
+        nullif(r.defense_coverage_type, '') AS coverage,
+        nullif(r.route, '') AS route,
         CAST(r.time_to_throw AS FLOAT) AS time_to_throw,
 """
 
