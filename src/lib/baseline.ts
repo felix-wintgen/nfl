@@ -2,7 +2,7 @@
 import { ensureSeasons, query } from './db';
 import { situationWhere, teamColumn, teamWhere, where, type Filters, type Side } from './filters';
 
-/** Metric name -> SQL aggregate over `plays`. */
+/** Metric name -> SQL aggregate over `plays` (or `table`). */
 export type Metrics = Record<string, string>;
 
 export interface Compared {
@@ -15,26 +15,42 @@ export interface Compared {
 	of: number;
 	/** Team plays behind `value`. */
 	n: number;
+	/** League plays behind `league`. */
+	leagueN: number;
+}
+
+export interface CompareOptions {
+	/** Split every number by this SQL expression (e.g. is_pass). */
+	groupBy?: string;
+	/** Extra conditions applied to team, league and per-team rows alike. */
+	extra?: string[];
+	/** View to read; defaults to `plays`. */
+	table?: 'plays' | 'fourth_downs';
 }
 
 /**
  * One query: the team's rows (with games window), the league's rows and each
  * team's value under the situation filters (for ranks).
- * `groupBy` optionally splits every number by a column (e.g. is_pass).
  */
-export function baselineSql(metrics: Metrics, f: Filters, side: Side, groupBy?: string): string {
+export function baselineSql(
+	metrics: Metrics,
+	f: Filters,
+	side: Side,
+	{ groupBy, extra = [], table = 'plays' }: CompareOptions = {}
+): string {
 	const cols = Object.entries(metrics)
 		.map(([k, expr]) => `${expr} AS "${k}"`)
 		.join(', ');
 	const g = groupBy ? `${groupBy} AS grp` : 'NULL AS grp';
 	const gb = groupBy ? ', grp' : '';
-	const sit = where(situationWhere(f, side));
+	const sit = where([...situationWhere(f, side), ...extra]);
+	const team = where([...teamWhere(f, side), ...extra]);
 	return `
 WITH
-  t AS (SELECT 'team' AS scope, ${g}, count(*) AS n, ${cols} FROM plays ${where(teamWhere(f, side))} GROUP BY ALL),
-  l AS (SELECT 'league' AS scope, ${g}, count(*) AS n, ${cols} FROM plays ${sit} GROUP BY ALL),
+  t AS (SELECT 'team' AS scope, ${g}, count(*) AS n, ${cols} FROM ${table} ${team} GROUP BY ALL),
+  l AS (SELECT 'league' AS scope, ${g}, count(*) AS n, ${cols} FROM ${table} ${sit} GROUP BY ALL),
   p AS (SELECT 'per_team' AS scope, ${g}, count(*) AS n, ${cols}, ${teamColumn(side)} AS team
-        FROM plays ${sit} GROUP BY ${teamColumn(side)}${gb})
+        FROM ${table} ${sit} GROUP BY ${teamColumn(side)}${gb})
 SELECT *, NULL AS team FROM t UNION ALL BY NAME
 SELECT *, NULL AS team FROM l UNION ALL BY NAME
 SELECT * FROM p`;
@@ -66,7 +82,8 @@ export function summarize(
 				league: num(l?.[k]),
 				rank: value === null ? null : vals.filter((v) => v > value).length + 1,
 				of: vals.length + 1,
-				n: t?.n ?? 0
+				n: t?.n ?? 0,
+				leagueN: l?.n ?? 0
 			};
 		}
 		out.set(g, res);
@@ -80,19 +97,54 @@ export async function compare(
 	metrics: Metrics,
 	f: Filters,
 	side: Side,
-	groupBy?: string
+	opts: CompareOptions = {}
 ): Promise<Map<unknown, Record<string, Compared>>> {
 	await ensureSeasons(f.seasons);
-	const rows = await query<Raw>(baselineSql(metrics, f, side, groupBy));
+	const rows = await query<Raw>(baselineSql(metrics, f, side, opts));
 	return summarize(rows, metrics, f.team!);
 }
 
-/** Common metric expressions. */
+/** Common metric expressions over `plays`. */
 export const M = {
 	passRate: 'avg(is_pass::INT)',
 	passOe: 'avg(is_pass::INT - xpass)',
 	epa: 'avg(epa)',
 	success: 'avg(success::INT)',
 	ypp: 'avg(yards_gained)',
-	explosive: 'avg(is_explosive::INT)'
+	explosive: 'avg(is_explosive::INT)',
+	// Early downs in neutral game script: the standard "pass-happy" measure.
+	earlyPass:
+		'avg(is_pass::INT) FILTER (WHERE down <= 2 AND NOT two_min AND wp BETWEEN 0.2 AND 0.8)',
+	noHuddle: 'avg(is_no_huddle::INT)',
+	motion: 'avg(is_motion::INT)',
+	playAction: 'avg(is_play_action::INT) FILTER (WHERE is_pass)',
+	screen: 'avg(is_screen::INT) FILTER (WHERE is_pass)',
+	rpo: 'avg(is_rpo::INT)',
+	shotgun: 'avg(is_shotgun::INT)'
 } as const;
+
+/** QB alignment; pistol is only distinguishable where participation data exists. */
+export const ALIGNMENT = `CASE WHEN formation = 'PISTOL' THEN 'pistol' WHEN is_shotgun THEN 'shotgun' ELSE 'under center' END`;
+
+/** Run lane from left end to right end. */
+export const RUN_LANE = `CASE WHEN run_dir = 'middle' THEN 'middle' WHEN run_dir IS NOT NULL AND run_gap IS NOT NULL THEN run_dir || ' ' || run_gap END`;
+export const RUN_LANES = [
+	'left end',
+	'left tackle',
+	'left guard',
+	'middle',
+	'right guard',
+	'right tackle',
+	'right end'
+] as const;
+
+/** Team-only query (no league baseline); `sql` receives the WHERE clause. */
+export async function teamQuery<T>(
+	f: Filters,
+	side: Side,
+	extra: string[],
+	sql: (whereClause: string) => string
+): Promise<T[]> {
+	await ensureSeasons(f.seasons);
+	return query<T>(sql(where([...teamWhere(f, side), ...extra])));
+}

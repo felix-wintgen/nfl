@@ -18,7 +18,7 @@ describe('summarize', () => {
 		];
 		// The team's own per_team row is excluded; its games-window value is ranked.
 		expect(summarize(rows, metrics, 'KC').get(null)).toEqual({
-			epa: { value: 0.1, league: 0.0, rank: 2, of: 4, n: 100 }
+			epa: { value: 0.1, league: 0.0, rank: 2, of: 4, n: 100, leagueN: 3000 }
 		});
 	});
 
@@ -41,7 +41,8 @@ describe('summarize', () => {
 			league: 0,
 			rank: null,
 			of: 1,
-			n: 0
+			n: 0,
+			leagueN: 3000
 		});
 	});
 });
@@ -56,5 +57,16 @@ describe('baselineSql', () => {
 		expect(sql).toContain("FROM plays WHERE defteam = 'KC' AND season IN (2025) AND down IN (3)");
 		expect(sql).toContain('FROM plays WHERE season IN (2025) AND down IN (3) GROUP BY ALL');
 		expect(sql).toContain('GROUP BY defteam');
+	});
+
+	it('applies extra conditions and the table to every part', () => {
+		const sql = baselineSql(metrics, { ...defaultFilters([2025]), team: 'KC' }, 'offense', {
+			groupBy: 'is_pass',
+			extra: ['down = 4'],
+			table: 'fourth_downs'
+		});
+		expect(sql.match(/FROM fourth_downs WHERE/g)).toHaveLength(3);
+		expect(sql.match(/AND down = 4/g)).toHaveLength(3);
+		expect(sql).toContain('GROUP BY posteam, grp');
 	});
 });

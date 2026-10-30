@@ -4,6 +4,7 @@ Downloads nflverse play-by-play, participation and FTN charting files, joins
 them per play, derives scouting columns (see derive.py) and writes:
 
     static/data/plays_{season}.parquet
+    static/data/fourth_{season}.parquet   (every 4th down incl. punts/FGs)
     static/data/teams.json
     static/data/games.json
     static/data/manifest.json
@@ -160,6 +161,35 @@ EMPTY_FTN = """(SELECT NULL::VARCHAR AS nflverse_game_id, NULL::INTEGER AS nflve
     NULL::BOOLEAN AS is_drop, NULL::BOOLEAN AS is_catchable_ball, NULL::INTEGER AS n_defense_box,
     NULL::INTEGER AS n_blitzers, NULL::INTEGER AS n_pass_rushers WHERE false)"""
 
+# Go-for-it decisions need punts and field goals, which plays_{season} drops.
+FOURTH_SQL = """
+COPY (
+    SELECT
+        p.game_id, CAST(p.play_id AS INTEGER) AS play_id,
+        p.season, p.week, p.season_type,
+        p.posteam, p.defteam, p.posteam = p.home_team AS is_home,
+        CAST(p.qtr AS TINYINT) AS qtr,
+        CAST(p.down AS TINYINT) AS down,
+        CAST(p.ydstogo AS TINYINT) AS ydstogo,
+        CAST(p.yardline_100 AS TINYINT) AS yardline_100,
+        CAST(p.score_differential AS SMALLINT) AS score_differential,
+        dist_bucket(p.ydstogo) AS dist_bucket,
+        field_zone(p.yardline_100, p.goal_to_go) AS field_zone,
+        score_state(p.score_differential) AS score_state,
+        two_min(p.qtr, p.half_seconds_remaining) AS two_min,
+        CAST(p.wp AS FLOAT) AS wp,
+        p.play_type,
+        p.play_type IN ('pass', 'run') AS went_for_it,
+        p.play_type IN ('pass', 'run') AND (p.first_down = 1 OR p.touchdown = 1) AS converted
+    FROM read_parquet('{pbp}') p
+    WHERE p.down = 4
+      AND p.play_type IN ('pass', 'run', 'punt', 'field_goal')
+      AND coalesce(p.qb_kneel, 0) = 0
+      AND p.posteam IS NOT NULL
+    ORDER BY p.game_id, p.play_id
+) TO '{out}' (FORMAT parquet, COMPRESSION zstd)
+"""
+
 
 def build_season(con: duckdb.DuckDBPyConnection, season: int, refresh: bool) -> Dict:
     pbp = download("pbp", f"play_by_play_{season}.parquet", refresh)
@@ -178,6 +208,7 @@ def build_season(con: duckdb.DuckDBPyConnection, season: int, refresh: bool) -> 
         ftn_src=f"read_parquet('{ftn}')" if ftn else EMPTY_FTN,
         out=out,
     ))
+    con.execute(FOURTH_SQL.format(pbp=pbp, out=OUT / f"fourth_{season}.parquet"))
 
     rows, last_week, part_match, ftn_match = con.execute(f"""
         SELECT count(*), max(week),

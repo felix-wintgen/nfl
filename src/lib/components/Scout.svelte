@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { replaceState } from '$app/navigation';
-	import { onMount, untrack } from 'svelte';
+	import { onMount, untrack, type Snippet } from 'svelte';
+	import { setMeta } from '#lib/context.ts';
 	import {
 		defaultFilters,
 		parseFilters,
@@ -10,14 +11,19 @@
 	} from '#lib/filters.ts';
 	import { loadMeta, type Meta } from '#lib/meta.ts';
 	import FilterBar from './FilterBar.svelte';
-	import RunPassSplit from './RunPassSplit.svelte';
 	import TeamPicker from './TeamPicker.svelte';
 
-	let { side, title, question }: { side: Side; title: string; question: string } = $props();
+	let {
+		side,
+		title,
+		question,
+		children
+	}: { side: Side; title: string; question: string; children: Snippet<[Filters]> } = $props();
 
 	let meta = $state<Meta | null>(null);
 	let filters = $state<Filters | null>(null);
 	let error = $state<string | null>(null);
+	setMeta(() => meta!);
 
 	onMount(async () => {
 		try {
@@ -81,7 +87,7 @@
 
 	<FilterBar bind:filters seasons={meta.seasons} onreset={resetSituation} />
 
-	<RunPassSplit {filters} {side} />
+	{@render children(filters)}
 {/if}
 
 <style>

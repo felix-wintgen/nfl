@@ -76,3 +76,75 @@ th.num {
 .small-sample {
 	opacity: 0.45;
 }
+
+.view {
+	margin-bottom: 1.25rem;
+}
+
+.view h2 {
+	margin: 0 0 0.25rem;
+	font-size: 1.1rem;
+}
+
+.view h2 + p.muted {
+	margin-top: 0;
+	font-size: 0.85rem;
+}
+
+.view h3 {
+	font-size: 0.9rem;
+	margin: 1.25rem 0 0.5rem;
+}
+
+.good {
+	color: var(--good);
+}
+
+.bad {
+	color: var(--bad);
+}
+
+.error {
+	color: var(--bad);
+}
+
+.league {
+	color: var(--muted);
+	font-size: 0.8rem;
+	margin-left: 0.35rem;
+}
+
+.foot {
+	color: var(--muted);
+	font-size: 0.8rem;
+	margin-bottom: 0;
+}
+
+.toggle {
+	display: inline-flex;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.toggle button {
+	font: inherit;
+	font-size: 0.8rem;
+	padding: 0.25rem 0.6rem;
+	border: none;
+	background: var(--bg);
+	color: inherit;
+	cursor: pointer;
+}
+
+.toggle button[aria-pressed='true'] {
+	background: var(--accent-soft);
+	color: var(--accent);
+	font-weight: 600;
+}
+
+/* Diverging scale vs. league: --more for above, --less for below. */
+:root {
+	--more: 234 88 12;
+	--less: 37 99 235;
+}
