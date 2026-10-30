@@ -1,7 +1,11 @@
 const dash = '–';
 
-export const pct = (v: number | null, digits = 0) =>
-	v === null ? dash : `${(v * 100).toFixed(digits)}%`;
+export function pct(v: number | null, digits = 0): string {
+	if (v === null) return dash;
+	const s = (v * 100).toFixed(digits);
+	// A small negative share rounds to "-0%"; show it as 0.
+	return `${Number(s) === 0 ? (0).toFixed(digits) : s}%`;
+}
 
 /** Signed percentage points, e.g. "+4.2 pp". */
 export const pp = (v: number | null) =>

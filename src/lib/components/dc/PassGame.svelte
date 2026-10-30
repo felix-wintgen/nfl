@@ -32,6 +32,7 @@
 		share3: number | null;
 		shareRz: number | null;
 		adot: number;
+		shareAy: number | null;
 		yards: number;
 		epa: number;
 	};
@@ -46,12 +47,14 @@
 				       count(*) AS targets,
 				       count(*) FILTER (WHERE down = 3) AS t3,
 				       count(*) FILTER (WHERE field_zone IN ('red zone', 'goal to go')) AS trz,
-				       avg(air_yards) AS adot, sum(yards_gained)::INTEGER AS yards, avg(epa) AS epa
+				       avg(air_yards) AS adot, coalesce(sum(air_yards), 0) AS ay,
+				       sum(yards_gained)::INTEGER AS yards, avg(epa) AS epa
 				FROM plays ${w} GROUP BY receiver_player_id)
 			SELECT id, name, targets, adot, yards, epa,
 			       targets / sum(targets) OVER () AS share,
 			       t3 / nullif(sum(t3) OVER (), 0) AS share3,
-			       trz / nullif(sum(trz) OVER (), 0) AS shareRz
+			       trz / nullif(sum(trz) OVER (), 0) AS shareRz,
+			       ay / nullif(sum(ay) OVER (), 0) AS shareAy
 			FROM r ORDER BY targets DESC LIMIT 10`
 		);
 
@@ -123,6 +126,11 @@
 							<th class="num">3rd down</th>
 							<th class="num">Red zone</th>
 							<th class="num">aDOT</th>
+							<th
+								class="num"
+								title="Share of the team's air yards: how far downfield the targets go"
+								>Air yards</th
+							>
 							<th class="num">Yards</th>
 							<th class="num">EPA / target</th>
 						</tr>
@@ -136,6 +144,7 @@
 								<td class="num">{pct(r.share3)}</td>
 								<td class="num">{pct(r.shareRz)}</td>
 								<td class="num">{num(r.adot)}</td>
+								<td class="num">{pct(r.shareAy)}</td>
 								<td class="num">{r.yards}</td>
 								<td class="num">{epa(r.epa)}</td>
 							</tr>
@@ -144,7 +153,9 @@
 				</table>
 			</div>
 			<p class="foot">
-				Shares are of all team targets in that situation, including players not shown.
+				Shares are of all team targets in that situation, including players not shown. Air yards is
+				the share of the team's air yards (how far past the line each target was thrown, caught or
+				not); screens count negative, so a back can sit near 0%.
 			</p>
 		{/snippet}
 	</Loader>
