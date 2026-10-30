@@ -1,11 +1,16 @@
 <script lang="ts">
+	import { getMeta } from '#lib/context.ts';
 	import type { Filters } from '#lib/filters.ts';
 	import { pct } from '#lib/format.ts';
+	import { withoutParticipation } from '#lib/meta.ts';
 	import { describe, loadTells, MIN_GAP, SHRINK_PLAYS } from '#lib/tells.ts';
 	import DataNote from '../DataNote.svelte';
 	import Loader from '../Loader.svelte';
 
 	let { filters }: { filters: Filters } = $props();
+
+	const meta = getMeta();
+	const load = (f: Filters) => loadTells(f, withoutParticipation(meta, f.seasons).length === 0);
 </script>
 
 <section class="card view">
@@ -16,10 +21,13 @@
 		Shown when at least {Math.round(MIN_GAP * 100)} points from the league.
 	</p>
 	<DataNote seasons={filters.seasons} what="Personnel tells" />
-	<Loader {filters} load={loadTells}>
+	<Loader {filters} {load}>
 		{#snippet children(tells)}
 			{#if tells.length === 0}
-				<p class="muted">Nothing stands out under these filters. Small samples rarely do: try adding the previous season.</p>
+				<p class="muted">
+					Nothing stands out under these filters. Small samples rarely do: try adding the previous
+					season.
+				</p>
 			{:else}
 				<ol>
 					{#each tells as t (describe(t))}

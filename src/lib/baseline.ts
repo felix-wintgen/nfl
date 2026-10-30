@@ -123,8 +123,17 @@ export const M = {
 	shotgun: 'avg(is_shotgun::INT)'
 } as const;
 
-/** QB alignment; pistol is only distinguishable where participation data exists. */
-export const ALIGNMENT = `CASE WHEN formation = 'PISTOL' THEN 'pistol' WHEN is_shotgun THEN 'shotgun' ELSE 'under center' END`;
+/**
+ * QB alignment. Play-by-play flags pistol snaps as shotgun; only participation
+ * data (formation) tells them apart. Split pistol out only when every selected
+ * season has that data. Otherwise fold it in for every season, so a row means
+ * the same thing in each season it covers.
+ */
+export const alignment = (splitPistol: boolean) =>
+	splitPistol
+		? `CASE WHEN formation = 'PISTOL' THEN 'pistol' WHEN is_shotgun THEN 'shotgun' ELSE 'under center' END`
+		: `CASE WHEN is_shotgun THEN 'shotgun or pistol' ELSE 'under center' END`;
+export const ALIGNMENTS = ['shotgun', 'shotgun or pistol', 'pistol', 'under center'] as const;
 
 /** Run lane from left end to right end. */
 export const RUN_LANE = `CASE WHEN run_dir = 'middle' THEN 'middle' WHEN run_dir IS NOT NULL AND run_gap IS NOT NULL THEN run_dir || ' ' || run_gap END`;

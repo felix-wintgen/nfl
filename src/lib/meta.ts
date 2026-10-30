@@ -34,6 +34,13 @@ export interface Meta {
 	defaultSeasons: number[];
 }
 
+/** Selected seasons without NGS participation data (personnel, formation, coverage …). */
+export function withoutParticipation(meta: Meta, seasons: number[]): number[] {
+	return meta.manifest.seasons
+		.filter((s) => seasons.includes(s.season) && !s.has_participation)
+		.map((s) => s.season);
+}
+
 let cached: Promise<Meta> | null = null;
 
 async function getJson<T>(path: Parameters<typeof asset>[0]): Promise<T> {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./db', () => ({ ensureSeasons: vi.fn(), query: vi.fn() }));
-const { baselineSql, summarize } = await import('./baseline.ts');
+const { alignment, baselineSql, summarize } = await import('./baseline.ts');
 const { defaultFilters } = await import('./filters.ts');
 
 const metrics = { epa: 'avg(epa)' };
@@ -77,5 +77,14 @@ describe('baselineSql', () => {
 		expect(sql.match(/FROM fourth_downs WHERE/g)).toHaveLength(3);
 		expect(sql.match(/AND down = 4/g)).toHaveLength(3);
 		expect(sql).toContain('GROUP BY posteam, grp');
+	});
+});
+
+describe('alignment', () => {
+	it('splits pistol out only when asked', () => {
+		expect(alignment(true)).toContain("formation = 'PISTOL' THEN 'pistol'");
+		// Folded: one definition for every season, labelled as such.
+		expect(alignment(false)).not.toContain('formation');
+		expect(alignment(false)).toContain("WHEN is_shotgun THEN 'shotgun or pistol'");
 	});
 });

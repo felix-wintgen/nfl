@@ -1,6 +1,6 @@
 // "Tells": situation combinations where an offense's run/pass mix departs most
 // from the league in the same combination.
-import { ALIGNMENT } from './baseline';
+import { alignment } from './baseline';
 import { ensureSeasons, query } from './db';
 import { situationWhere, teamWhere, where, type Filters } from './filters';
 import { ordinal } from './format';
@@ -8,13 +8,13 @@ import { ordinal } from './format';
 export const DIMS = ['pers', 'align', 'down', 'dist', 'zone'] as const;
 export type Dim = (typeof DIMS)[number];
 
-const DIM_EXPR: Record<Dim, string> = {
+const dimExpr = (splitPistol: boolean): Record<Dim, string> => ({
 	pers: 'off_personnel',
-	align: ALIGNMENT,
+	align: alignment(splitPistol),
 	down: 'down',
 	dist: 'dist_bucket',
 	zone: 'field_zone'
-};
+});
 
 // Combinations a coordinator would actually call out.
 export const SETS: Dim[][] = [
@@ -54,8 +54,10 @@ export const MIN_GAP = 0.05;
 export const shrink = (n: number, rate: number, league: number) =>
 	(n * rate + SHRINK_PLAYS * league) / (n + SHRINK_PLAYS);
 
-export function tellsSql(f: Filters): string {
-	const cols = DIMS.map((d) => `${DIM_EXPR[d]}::VARCHAR AS ${d}`).join(', ');
+/** `splitPistol`: every selected season has formation data (see `alignment`). */
+export function tellsSql(f: Filters, splitPistol: boolean): string {
+	const expr = dimExpr(splitPistol);
+	const cols = DIMS.map((d) => `${expr[d]}::VARCHAR AS ${d}`).join(', ');
 	const sets = SETS.map((s) => `(${s.join(', ')})`).join(', ');
 	const agg = (w: string[]) => `
     SELECT GROUPING(${DIMS.join(', ')}) AS gid, ${DIMS.join(', ')}, count(*) AS n, avg(is_pass::INT) AS p
@@ -130,7 +132,7 @@ export function describe(t: Tell): string {
 	return parts.join(' · ');
 }
 
-export async function loadTells(f: Filters): Promise<Tell[]> {
+export async function loadTells(f: Filters, splitPistol: boolean): Promise<Tell[]> {
 	await ensureSeasons(f.seasons);
-	return pickTells(await query<Row>(tellsSql(f)));
+	return pickTells(await query<Row>(tellsSql(f, splitPistol)));
 }

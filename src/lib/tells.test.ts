@@ -102,9 +102,16 @@ group('describe', () => {
 
 group('tellsSql', () => {
 	it('aggregates team and league with the same grouping sets', () => {
-		const sql = tellsSql({ ...defaultFilters([2025]), team: 'KC' });
+		const sql = tellsSql({ ...defaultFilters([2025]), team: 'KC' }, true);
 		expect(sql.match(/GROUPING SETS/g)).toHaveLength(2);
 		expect(sql).toContain("posteam = 'KC'");
 		expect(sql).toContain('t.gid = l.gid');
+	});
+
+	it('splits pistol from shotgun only when told every season has formation data', () => {
+		const f = { ...defaultFilters([2025, 2026]), team: 'KC' };
+		expect(tellsSql(f, true)).toContain("'pistol'");
+		expect(tellsSql(f, false)).not.toContain('PISTOL');
+		expect(tellsSql(f, false)).toContain("'shotgun or pistol'");
 	});
 });

@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { ALIGNMENT, M } from '#lib/baseline.ts';
+	import { alignment, ALIGNMENTS, M } from '#lib/baseline.ts';
+	import { getMeta } from '#lib/context.ts';
 	import type { Filters } from '#lib/filters.ts';
+	import { withoutParticipation } from '#lib/meta.ts';
 	import DataNote from '../DataNote.svelte';
 	import GroupTable, { type Column } from '../GroupTable.svelte';
 
@@ -14,6 +16,9 @@
 	];
 
 	const personnel = (g: string) => `${g} personnel`;
+
+	const meta = getMeta();
+	const noFormation = $derived(withoutParticipation(meta, filters.seasons));
 </script>
 
 <section class="card view">
@@ -37,10 +42,15 @@
 	<GroupTable
 		{filters}
 		side="offense"
-		groupBy={ALIGNMENT}
+		groupBy={alignment(noFormation.length === 0)}
 		groupLabel="Alignment"
-		order={['shotgun', 'pistol', 'under center']}
+		order={ALIGNMENTS}
 		{columns}
 	/>
-	<p class="foot">Pistol is folded into shotgun for seasons without participation data.</p>
+	{#if noFormation.length}
+		<p class="foot">
+			Pistol can't be split from shotgun: {noFormation.join(', ')} has no formation data yet. Select only
+			earlier seasons to see it on its own.
+		</p>
+	{/if}
 </section>
