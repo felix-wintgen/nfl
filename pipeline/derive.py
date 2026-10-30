@@ -13,9 +13,8 @@ import duckdb
 #   2023+:          "1 C, 2 G, 1 QB, 1 RB, 2 T, 1 TE, 3 WR" / "3 CB, 2 DE, 2 DT, 1 FS, 1 MLB, 1 OLB, 1 SS"
 MACROS = r"""
 CREATE OR REPLACE MACRO pos_count(personnel, pos) AS
-    coalesce(list_sum(list_transform(
-        regexp_extract_all(personnel, '(\d+) ' || pos || '\b', 1),
-        x -> CAST(x AS INTEGER))), 0);
+    coalesce(list_sum(CAST(
+        regexp_extract_all(personnel, '(\d+) ' || pos || '\b', 1) AS INTEGER[])), 0);
 
 -- Offensive grouping as RB+FB count followed by TE count: '11', '12', '21' ...
 -- An extra offensive lineman (6+ OL) is marked with a trailing '+OL'.
