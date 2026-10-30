@@ -21,3 +21,14 @@ export function ordinal(n: number): string {
 
 /** Below this many plays, numbers are shown greyed out. */
 export const SMALL_SAMPLE = 30;
+
+/** nflverse week number as a label: weeks 19–22 are the playoff rounds. */
+export function weekLabel(week: number): string {
+	const playoffs: Record<number, string> = {
+		19: 'wild card round',
+		20: 'divisional round',
+		21: 'conference championships',
+		22: 'Super Bowl'
+	};
+	return playoffs[week] ?? `week ${week}`;
+}

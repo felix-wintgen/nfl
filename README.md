@@ -26,7 +26,21 @@ Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-dow
 ## Known data gaps
 
 - NGS participation (personnel, formation, coverage, routes, pressure) is not published for the current season yet; those columns are NULL for 2026.
-- Coverage type is filled on ~55–60% of plays, routes on ~40%.
+- Coverage and targeted route exist only for dropbacks (~99% of them from 2023 on, ~89% in 2022).
+
+## Deployment
+
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) rebuilds the data and deploys the site to GitHub Pages on every push to `main`, daily at 10:00 UTC, and on demand (Actions → Build and deploy → Run workflow). If the pipeline's sanity checks fail, nothing is deployed and the previous site stays up.
+
+One-time setup: in the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
+
+The site is served under `/<repo>/`; the workflow passes that as `BASE_PATH`. To check a production build locally:
+
+```sh
+BASE_PATH=/nfl npm run build
+```
+
+GitHub disables scheduled workflows after 60 days without repository activity; re-enable it on the Actions tab if the data stops updating.
 
 ## License / attribution
 
