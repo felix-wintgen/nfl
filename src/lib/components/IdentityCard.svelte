@@ -72,6 +72,17 @@
 	<h2>{title}</h2>
 	<p class="muted">{subtitle}</p>
 	<Loader {filters} {load}>
+		{#snippet pending()}
+			<div class="tiles">
+				{#each items as i (i.key)}
+					<div class="tile">
+						<div class="title">{i.label}</div>
+						<div class="value muted">–</div>
+						<div class="sub">&nbsp;</div>
+					</div>
+				{/each}
+			</div>
+		{/snippet}
 		{#snippet children(res)}
 			<div class="tiles">
 				{#each items as i (i.key)}
@@ -102,7 +113,7 @@
 <style>
 	.tiles {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 		gap: 0.75rem;
 		margin-top: 0.75rem;
 	}

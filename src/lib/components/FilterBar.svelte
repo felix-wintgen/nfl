@@ -8,6 +8,7 @@
 		SCORE_STATES,
 		SEASON_TYPES,
 		VENUES,
+		describeFilters,
 		type Filters
 	} from '#lib/filters.ts';
 
@@ -16,6 +17,9 @@
 		seasons,
 		onreset
 	}: { filters: Filters; seasons: number[]; onreset: () => void } = $props();
+
+	// On narrow screens the filters collapse behind a summary line.
+	let open = $state(false);
 
 	function toggle<T>(values: T[], v: T, keepOne = false): T[] {
 		if (!values.includes(v)) return [...values, v];
@@ -72,7 +76,11 @@
 	</label>
 {/snippet}
 
-<div class="bar card">
+<div class="bar card" class:open>
+	<button type="button" class="summary" aria-expanded={open} onclick={() => (open = !open)}>
+		<span>Filters: {describeFilters(filters)}</span>
+		<span aria-hidden="true">{open ? '▴' : '▾'}</span>
+	</button>
 	<div class="row">
 		{@render chips('Seasons', seasons, filters.seasons, (v) => (filters.seasons = v.sort()), true)}
 		{@render select('Games', GAME_WINDOWS, filters.games, (v) => (filters.games = v))}
@@ -95,6 +103,28 @@
 </div>
 
 <style>
+	.summary {
+		display: none;
+	}
+	@media (max-width: 640px) {
+		.summary {
+			display: flex;
+			justify-content: space-between;
+			gap: 0.5rem;
+			width: 100%;
+			padding: 0;
+			border: none;
+			background: none;
+			color: inherit;
+			font: inherit;
+			font-size: 0.85rem;
+			text-align: left;
+			cursor: pointer;
+		}
+		.bar:not(.open) .row {
+			display: none;
+		}
+	}
 	.bar {
 		display: grid;
 		gap: 0.75rem;

@@ -11,7 +11,7 @@
 <div class="divisions">
 	{#each divisions as [division, members] (division)}
 		<section>
-			<h3>{division}</h3>
+			<h2>{division}</h2>
 			{#each members ?? [] as t (t.abbr)}
 				<button type="button" onclick={() => onpick(t.abbr)} style:--team={t.color}>
 					<img src={t.logo} alt="" width="28" height="28" loading="lazy" />
@@ -28,7 +28,7 @@
 		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 		gap: 1rem;
 	}
-	h3 {
+	h2 {
 		font-size: 0.8rem;
 		color: var(--muted);
 		margin: 0 0 0.25rem;

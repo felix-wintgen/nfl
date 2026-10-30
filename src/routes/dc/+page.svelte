@@ -63,8 +63,11 @@
 		<Tells {filters} />
 		<Personnel {filters} />
 		<TendencyGrid {filters} />
-		<RunPassSplit {filters} side="offense" />
-		<RunGame {filters} />
-		<PassGame {filters} />
+		<!-- Left off the printed game sheet to keep it to about two pages. -->
+		<div class="no-print">
+			<RunPassSplit {filters} side="offense" />
+			<RunGame {filters} />
+			<PassGame {filters} />
+		</div>
 	{/snippet}
 </Scout>

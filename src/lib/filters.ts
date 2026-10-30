@@ -155,3 +155,24 @@ export function teamWhere(f: Filters, side: Side): string[] {
 }
 
 export const where = (conds: string[]) => (conds.length ? `WHERE ${conds.join(' AND ')}` : '');
+
+/** One-line summary of the active filters, e.g. for the printed game sheet. */
+export function describeFilters(f: Filters): string {
+	const seasons = [...f.seasons].sort();
+	const contiguous = seasons.every((s, i) => i === 0 || s === seasons[i - 1] + 1);
+	const parts: string[] = [
+		seasons.length > 1 && contiguous
+			? `${seasons[0]}–${seasons.at(-1)}`
+			: seasons.join(', ') || 'all seasons'
+	];
+	if (f.games !== 'all') parts.push(f.games === 'last4' ? 'last 4 games' : 'last 8 games');
+	if (f.seasonType !== 'all') parts.push(f.seasonType === 'REG' ? 'regular season' : 'playoffs');
+	const ord = (d: number) => ['1st', '2nd', '3rd', '4th'][d - 1];
+	if (f.downs.length) parts.push(`${f.downs.map(ord).join('/')} down`);
+	if (f.dist.length) parts.push(`${f.dist.join('/')} to go`);
+	if (f.zones.length) parts.push(f.zones.join('/'));
+	if (f.score.length) parts.push(f.score.join('/'));
+	if (f.clock !== 'all') parts.push(f.clock === 'two_min' ? 'two-minute' : 'outside two-minute');
+	if (f.venue !== 'all') parts.push(f.venue);
+	return parts.join(' · ');
+}

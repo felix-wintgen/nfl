@@ -37,28 +37,30 @@
 {#if error}
 	<p class="error">{error}</p>
 {:else if manifest}
-	<table>
-		<thead>
-			<tr>
-				<th>Season</th>
-				<th class="num">Plays</th>
-				<th class="num">Through week</th>
-				<th>Personnel / coverage</th>
-				<th>FTN charting</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each manifest.seasons as s (s.season)}
+	<div class="scroll">
+		<table>
+			<thead>
 				<tr>
-					<td>{s.season}</td>
-					<td class="num">{s.rows.toLocaleString()}</td>
-					<td class="num">{s.last_week}</td>
-					<td>{s.has_participation ? 'yes' : 'not published yet'}</td>
-					<td>{s.has_ftn ? 'yes' : 'no'}</td>
+					<th>Season</th>
+					<th class="num">Plays</th>
+					<th class="num">Through week</th>
+					<th>Personnel / coverage</th>
+					<th>FTN charting</th>
 				</tr>
-			{/each}
-		</tbody>
-	</table>
+			</thead>
+			<tbody>
+				{#each manifest.seasons as s (s.season)}
+					<tr>
+						<td>{s.season}</td>
+						<td class="num">{s.rows.toLocaleString()}</td>
+						<td class="num">{s.last_week}</td>
+						<td>{s.has_participation ? 'yes' : 'not published yet'}</td>
+						<td>{s.has_ftn ? 'yes' : 'no'}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
 	<p class="muted">Built {new Date(manifest.built_at).toLocaleString()}</p>
 {:else}
 	<p>Loading…</p>

@@ -45,10 +45,11 @@
 		});
 	}
 
-	function shade(team: number | null, league: number | null): string {
-		if (team === null || league === null) return 'transparent';
+	// Small samples stay unshaded: they're shown muted and shouldn't stand out.
+	function shade(team: number | null, league: number | null, n: number): string {
+		if (team === null || league === null || n < SMALL_SAMPLE) return 'transparent';
 		const d = Math.max(-1, Math.min(1, (team - league) / Math.max(league, 0.08)));
-		return `rgb(${d >= 0 ? 'var(--more)' : 'var(--less)'} / ${(Math.abs(d) * 0.5).toFixed(2)})`;
+		return `rgb(${d >= 0 ? 'var(--more)' : 'var(--less)'} / ${(Math.abs(d) * 0.4).toFixed(2)})`;
 	}
 
 	const fmt = (c: Column, v: number | null | undefined) =>
@@ -84,7 +85,7 @@
 							<th scope="row">{row.label}</th>
 							<td class="num">{row.tn}</td>
 							{#each row.shares as s (s.key)}
-								<td class="num cell" style:background={shade(s.team, s.league)}>
+								<td class="num cell" style:background={shade(s.team, s.league, row.tn)}>
 									{pct(s.team)}<span class="league">{pct(s.league)}</span>
 								</td>
 							{/each}
@@ -104,9 +105,6 @@
 </Loader>
 
 <style>
-	.scroll {
-		overflow-x: auto;
-	}
 	.mix th[scope='row'] {
 		white-space: nowrap;
 		color: var(--fg);
@@ -115,6 +113,9 @@
 	}
 	.cell {
 		white-space: nowrap;
+	}
+	.cell .league {
+		color: var(--muted-strong);
 	}
 	.metric {
 		border-left: 1px solid var(--line);

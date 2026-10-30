@@ -68,10 +68,10 @@
 	}
 
 	// Heat by target share relative to the league share in the same cell.
-	function shade(share: number, lshare: number): string {
-		if (!lshare) return 'transparent';
+	function shade(share: number, lshare: number, n: number): string {
+		if (!lshare || n < 10) return 'transparent';
 		const d = Math.max(-1, Math.min(1, (share - lshare) / Math.max(lshare, 0.04)));
-		return `rgb(${d >= 0 ? 'var(--more)' : 'var(--less)'} / ${(Math.abs(d) * 0.55).toFixed(2)})`;
+		return `rgb(${d >= 0 ? 'var(--more)' : 'var(--less)'} / ${(Math.abs(d) * 0.4).toFixed(2)})`;
 	}
 </script>
 
@@ -96,7 +96,7 @@
 						<div
 							class="cell"
 							class:small-sample={!c.r || c.r.epa.n < 10}
-							style:background={shade(c.share, c.lshare)}
+							style:background={shade(c.share, c.lshare, c.r?.epa.n ?? 0)}
 						>
 							<div class="v">{pct(c.share)}<span class="league">{pct(c.lshare)}</span></div>
 							<div class="l">
@@ -113,34 +113,36 @@
 	<h3>Targets</h3>
 	<Loader {filters} load={loadReceivers}>
 		{#snippet children(receivers)}
-			<table>
-				<thead>
-					<tr>
-						<th>Player</th>
-						<th class="num">Targets</th>
-						<th class="num">Share</th>
-						<th class="num">3rd down</th>
-						<th class="num">Red zone</th>
-						<th class="num">aDOT</th>
-						<th class="num">Yards</th>
-						<th class="num">EPA / target</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each receivers as r (r.id)}
-						<tr class:small-sample={r.targets < SMALL_SAMPLE / 2}>
-							<td>{r.name}</td>
-							<td class="num">{r.targets}</td>
-							<td class="num">{pct(r.share)}</td>
-							<td class="num">{pct(r.share3)}</td>
-							<td class="num">{pct(r.shareRz)}</td>
-							<td class="num">{num(r.adot)}</td>
-							<td class="num">{r.yards}</td>
-							<td class="num">{epa(r.epa)}</td>
+			<div class="scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>Player</th>
+							<th class="num">Targets</th>
+							<th class="num">Share</th>
+							<th class="num">3rd down</th>
+							<th class="num">Red zone</th>
+							<th class="num">aDOT</th>
+							<th class="num">Yards</th>
+							<th class="num">EPA / target</th>
 						</tr>
-					{/each}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						{#each receivers as r (r.id)}
+							<tr class:small-sample={r.targets < SMALL_SAMPLE / 2}>
+								<td>{r.name}</td>
+								<td class="num">{r.targets}</td>
+								<td class="num">{pct(r.share)}</td>
+								<td class="num">{pct(r.share3)}</td>
+								<td class="num">{pct(r.shareRz)}</td>
+								<td class="num">{num(r.adot)}</td>
+								<td class="num">{r.yards}</td>
+								<td class="num">{epa(r.epa)}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
 			<p class="foot">
 				Shares are of all team targets in that situation, including players not shown.
 			</p>
@@ -183,6 +185,9 @@
 	}
 	.l {
 		font-size: 0.72rem;
-		color: var(--muted);
+		color: var(--muted-strong);
+	}
+	.cell .league {
+		color: var(--muted-strong);
 	}
 </style>

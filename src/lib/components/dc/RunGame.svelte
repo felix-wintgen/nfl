@@ -91,30 +91,32 @@
 	<h3>Ball carriers</h3>
 	<Loader {filters} load={loadRushers}>
 		{#snippet children(rushers)}
-			<table>
-				<thead>
-					<tr>
-						<th>Player</th>
-						<th class="num">Carries</th>
-						<th class="num">Share</th>
-						<th class="num">Yards / carry</th>
-						<th class="num">Success</th>
-						<th class="num">EPA / carry</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each rushers as r (r.id)}
-						<tr class:small-sample={r.carries < SMALL_SAMPLE / 2}>
-							<td>{r.name}</td>
-							<td class="num">{r.carries}</td>
-							<td class="num">{pct(r.share)}</td>
-							<td class="num">{num(r.ypc)}</td>
-							<td class="num">{pct(r.success, 1)}</td>
-							<td class="num">{epa(r.epa)}</td>
+			<div class="scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>Player</th>
+							<th class="num">Carries</th>
+							<th class="num">Share</th>
+							<th class="num">Yards / carry</th>
+							<th class="num">Success</th>
+							<th class="num">EPA / carry</th>
 						</tr>
-					{/each}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						{#each rushers as r (r.id)}
+							<tr class:small-sample={r.carries < SMALL_SAMPLE / 2}>
+								<td>{r.name}</td>
+								<td class="num">{r.carries}</td>
+								<td class="num">{pct(r.share)}</td>
+								<td class="num">{num(r.ypc)}</td>
+								<td class="num">{pct(r.success, 1)}</td>
+								<td class="num">{epa(r.epa)}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
 		{/snippet}
 	</Loader>
 </section>

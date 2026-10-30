@@ -35,41 +35,43 @@
 	</p>
 	<Loader {filters} {load}>
 		{#snippet children(split)}
-			<table>
-				<thead>
-					<tr>
-						<th>Play type</th>
-						<th class="num">Plays</th>
-						<th class="num">Share</th>
-						{#each cols as [key, label] (key)}
-							<th class="num">{label}</th>
-						{/each}
-					</tr>
-				</thead>
-				<tbody>
-					{#each [[true, 'Pass'], [false, 'Run']] as const as [isPass, name] (name)}
-						{@const r = split.get(isPass)}
-						{#if r}
-							<tr class:small-sample={r.epa.n < SMALL_SAMPLE}>
-								<td>{name}</td>
-								<td class="num">{r.epa.n}</td>
-								<td class="num">
-									{pct(r.epa.n / sum(split, 'n'))}<span class="league"
-										>{pct(r.epa.leagueN / sum(split, 'leagueN'))}</span
-									>
-								</td>
-								{#each cols as [key, , fmt] (key)}
+			<div class="scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>Play type</th>
+							<th class="num">Plays</th>
+							<th class="num">Share</th>
+							{#each cols as [key, label] (key)}
+								<th class="num">{label}</th>
+							{/each}
+						</tr>
+					</thead>
+					<tbody>
+						{#each [[true, 'Pass'], [false, 'Run']] as const as [isPass, name] (name)}
+							{@const r = split.get(isPass)}
+							{#if r}
+								<tr class:small-sample={r.epa.n < SMALL_SAMPLE}>
+									<td>{name}</td>
+									<td class="num">{r.epa.n}</td>
 									<td class="num">
-										<span class={tone(r[key])}>{fmt(r[key].value)}</span><span class="league"
-											>{fmt(r[key].league)}</span
+										{pct(r.epa.n / sum(split, 'n'))}<span class="league"
+											>{pct(r.epa.leagueN / sum(split, 'leagueN'))}</span
 										>
 									</td>
-								{/each}
-							</tr>
-						{/if}
-					{/each}
-				</tbody>
-			</table>
+									{#each cols as [key, , fmt] (key)}
+										<td class="num">
+											<span class={tone(r[key])}>{fmt(r[key].value)}</span><span class="league"
+												>{fmt(r[key].league)}</span
+											>
+										</td>
+									{/each}
+								</tr>
+							{/if}
+						{/each}
+					</tbody>
+				</table>
+			</div>
 		{/snippet}
 	</Loader>
 </section>

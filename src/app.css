@@ -8,6 +8,9 @@
 	--accent-soft: #fef3c7;
 	--good: #15803d;
 	--bad: #b91c1c;
+	--muted-strong: #44403c;
+	--more-text: #c2410c;
+	--less-text: #1d4ed8;
 	color-scheme: light;
 }
 
@@ -22,6 +25,9 @@
 		--accent-soft: #451a03;
 		--good: #4ade80;
 		--bad: #f87171;
+		--muted-strong: #d6d3d1;
+		--more-text: #fb923c;
+		--less-text: #60a5fa;
 		color-scheme: dark;
 	}
 }
@@ -73,8 +79,11 @@ th.num {
 	text-align: right;
 }
 
-.small-sample {
-	opacity: 0.45;
+/* Muted color rather than transparency, so the text keeps enough contrast. */
+.small-sample,
+.small-sample .good,
+.small-sample .bad {
+	color: var(--muted);
 }
 
 .view {
@@ -143,8 +152,76 @@ th.num {
 	font-weight: 600;
 }
 
-/* Diverging scale vs. league: --more for above, --less for below. */
+/* Diverging scale vs. league: --more for above, --less for below (backgrounds,
+   used at up to 40% alpha; text on them uses --muted-strong). */
 :root {
 	--more: 234 88 12;
 	--less: 37 99 235;
+}
+
+.print-only {
+	display: none;
+}
+
+/* Game sheet: light colors, no controls, cards kept whole. */
+@media print {
+	:root {
+		--bg: #fff;
+		--fg: #000;
+		--muted: #555;
+		--card: #fff;
+		--line: #ccc;
+		--accent: #b45309;
+		--accent-soft: #fef3c7;
+		--good: #15803d;
+		--bad: #b91c1c;
+		--muted-strong: #44403c;
+		--more-text: #c2410c;
+		--less-text: #1d4ed8;
+		color-scheme: light;
+	}
+	@page {
+		margin: 12mm;
+	}
+	/* Scale the root so rem-sized text shrinks along with the body. */
+	html {
+		font-size: 11px;
+	}
+	body {
+		font-size: 10px;
+		print-color-adjust: exact;
+		-webkit-print-color-adjust: exact;
+	}
+	body > div > header,
+	.asof,
+	.screen-only,
+	.no-print,
+	.toggle,
+	.foot {
+		display: none !important;
+	}
+	.print-only {
+		display: block;
+	}
+	.card {
+		border: 1px solid var(--line);
+		padding: 0.5rem 0.75rem;
+		break-inside: avoid;
+	}
+	.view {
+		margin-bottom: 0.6rem;
+	}
+	th,
+	td {
+		padding: 0.15rem 0.35rem;
+	}
+	a {
+		color: inherit;
+		text-decoration: none;
+	}
+}
+
+/* Wide tables scroll inside their card instead of widening the page. */
+.scroll {
+	overflow-x: auto;
 }

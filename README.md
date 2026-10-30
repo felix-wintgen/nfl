@@ -44,4 +44,4 @@ GitHub disables scheduled workflows after 60 days without repository activity; r
 
 ## License / attribution
 
-The NFL data belongs to its respective owners. The nflverse data comes with its own terms (FTN charting requires attribution).
+Most nflverse data (play-by-play, NGS participation) is CC-BY 4.0. FTN charting data is CC-BY-SA 4.0 and must be credited to "ftndata.com via nflverse"; the site footer does both. The NFL data belongs to its respective owners.

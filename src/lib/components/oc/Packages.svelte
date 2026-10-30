@@ -67,61 +67,63 @@
 			{#if list.length === 0}
 				<p class="muted">No plays with personnel data.</p>
 			{:else}
-				<table>
-					<thead>
-						<tr>
-							<th>You show</th>
-							<th class="num">Plays</th>
-							<th>They answer with</th>
-							<th class="num">Box</th>
-							<th class="num">Blitz</th>
-							<th class="num">Pass rate faced</th>
-							<th class="num">EPA allowed</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each list as { g, r, n } (g)}
-							<tr class:small-sample={n < SMALL_SAMPLE}>
-								<td>{g} personnel</td>
-								<td class="num">{n}</td>
-								<td>
-									<svg
-										class="stack"
-										viewBox="0 0 1 1"
-										preserveAspectRatio="none"
-										aria-hidden="true"
-									>
-										{#each segments(r, 'value') as s (s.key)}
-											<rect x={s.x} y="0" width={s.w} height="0.68" class="seg-{s.key}" />
-										{/each}
-										{#each segments(r, 'league') as s (s.key)}
-											<rect x={s.x} y="0.78" width={s.w} height="0.22" class="seg-{s.key}" />
-										{/each}
-									</svg>
-									<span class="shares">
-										{#each PACKAGES as p (p.key)}
-											{#if (r[p.key].value ?? 0) >= 0.05}
-												<span>{p.label} {pct(r[p.key].value)}</span>
-											{/if}
-										{/each}
-									</span>
-								</td>
-								<td class="num"
-									>{num(r.box.value)}<span class="league">{num(r.box.league)}</span></td
-								>
-								<td class="num"
-									>{pct(r.blitz.value)}<span class="league">{pct(r.blitz.league)}</span></td
-								>
-								<td class="num"
-									>{pct(r.pass.value)}<span class="league">{pct(r.pass.league)}</span></td
-								>
-								<td class="num"
-									>{epa(r.epa.value)}<span class="league">{epa(r.epa.league)}</span></td
-								>
+				<div class="scroll">
+					<table>
+						<thead>
+							<tr>
+								<th>You show</th>
+								<th class="num">Plays</th>
+								<th>They answer with</th>
+								<th class="num">Box</th>
+								<th class="num">Blitz</th>
+								<th class="num">Pass rate faced</th>
+								<th class="num">EPA allowed</th>
 							</tr>
-						{/each}
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							{#each list as { g, r, n } (g)}
+								<tr class:small-sample={n < SMALL_SAMPLE}>
+									<td>{g} personnel</td>
+									<td class="num">{n}</td>
+									<td>
+										<svg
+											class="stack"
+											viewBox="0 0 1 1"
+											preserveAspectRatio="none"
+											aria-hidden="true"
+										>
+											{#each segments(r, 'value') as s (s.key)}
+												<rect x={s.x} y="0" width={s.w} height="0.68" class="seg-{s.key}" />
+											{/each}
+											{#each segments(r, 'league') as s (s.key)}
+												<rect x={s.x} y="0.78" width={s.w} height="0.22" class="seg-{s.key}" />
+											{/each}
+										</svg>
+										<span class="shares">
+											{#each PACKAGES as p (p.key)}
+												{#if (r[p.key].value ?? 0) >= 0.05}
+													<span>{p.label} {pct(r[p.key].value)}</span>
+												{/if}
+											{/each}
+										</span>
+									</td>
+									<td class="num"
+										>{num(r.box.value)}<span class="league">{num(r.box.league)}</span></td
+									>
+									<td class="num"
+										>{pct(r.blitz.value)}<span class="league">{pct(r.blitz.league)}</span></td
+									>
+									<td class="num"
+										>{pct(r.pass.value)}<span class="league">{pct(r.pass.league)}</span></td
+									>
+									<td class="num"
+										>{epa(r.epa.value)}<span class="league">{epa(r.epa.league)}</span></td
+									>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
 			{/if}
 		{/snippet}
 	</Loader>

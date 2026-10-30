@@ -29,6 +29,10 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	<meta
+		name="description"
+		content="Opponent scouting for NFL coordinators: offensive tendencies and tells, defensive packages, coverage and pressure, built on nflverse data."
+	/>
 </svelte:head>
 
 <header>
@@ -40,24 +44,27 @@
 		{/each}
 	</nav>
 </header>
-{#if asOf}
-	<div class="asof">
+<!-- Always rendered so the page doesn't shift down once the manifest arrives. -->
+<div class="asof">
+	{#if asOf}
 		Data through {asOf.latest.season}
 		{weekLabel(asOf.latest.last_week)} · updated {asOf.builtAt.toLocaleDateString(undefined, {
 			month: 'short',
 			day: 'numeric',
 			year: 'numeric'
 		})}
-	</div>
-{/if}
+	{/if}
+</div>
 
 <main>
 	{@render children()}
 </main>
 
 <footer>
-	Data: <a href="https://github.com/nflverse">nflverse</a> (play-by-play, NGS participation, FTN charting).
-	NFL data belongs to its respective owners.
+	Play-by-play and NGS participation data:
+	<a href="https://github.com/nflverse">nflverse</a> (CC-BY 4.0). Charting data:
+	<a href="https://ftndata.com">ftndata.com</a> via nflverse (CC-BY-SA 4.0). NFL data belongs to its respective
+	owners.
 </footer>
 
 <style>
@@ -97,6 +104,7 @@
 		font-size: 0.78rem;
 		color: var(--muted);
 		text-align: right;
+		min-height: 1.2em;
 	}
 	main {
 		padding-top: 1.5rem;

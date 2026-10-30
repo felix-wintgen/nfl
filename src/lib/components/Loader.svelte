@@ -4,11 +4,18 @@
 
 	// Re-runs `load` whenever any filter changes; drops results of outdated runs.
 	// The previous result stays visible (dimmed) while the next one loads.
+	// The first load reserves space (or renders `pending`) so the page doesn't jump.
 	let {
 		filters,
 		load,
-		children
-	}: { filters: Filters; load: (f: Filters) => Promise<T>; children: Snippet<[T]> } = $props();
+		children,
+		pending
+	}: {
+		filters: Filters;
+		load: (f: Filters) => Promise<T>;
+		children: Snippet<[T]>;
+		pending?: Snippet;
+	} = $props();
 
 	let data = $state<{ value: T } | null>(null);
 	let error = $state<string | null>(null);
@@ -36,7 +43,11 @@
 {#if error}
 	<p class="error">{error}</p>
 {:else if !data}
-	<p class="muted">Loading…</p>
+	{#if pending}
+		<div aria-busy="true">{@render pending()}</div>
+	{:else}
+		<p class="muted placeholder" aria-busy="true">Loading…</p>
+	{/if}
 {:else}
 	<div class="loaded" class:updating aria-busy={updating}>
 		{@render children(data.value)}
@@ -49,5 +60,8 @@
 	}
 	.updating {
 		opacity: 0.5;
+	}
+	.placeholder {
+		min-height: 10rem;
 	}
 </style>

@@ -4,12 +4,15 @@
 	import { setMeta } from '#lib/context.ts';
 	import {
 		defaultFilters,
+		describeFilters,
 		parseFilters,
 		serializeFilters,
 		type Filters,
 		type Side
 	} from '#lib/filters.ts';
+	import { warmUp } from '#lib/db.ts';
 	import { loadMeta, type Meta } from '#lib/meta.ts';
+	import EngineNotice from './EngineNotice.svelte';
 	import FilterBar from './FilterBar.svelte';
 	import TeamPicker from './TeamPicker.svelte';
 
@@ -30,6 +33,9 @@
 			meta = await loadMeta();
 			const defaults = defaultFilters(meta.defaultSeasons);
 			filters = parseFilters(new URLSearchParams(location.search), meta.seasons, defaults);
+			// Start the engine download once the page's own small files are in, so
+			// it doesn't compete with them for bandwidth on first paint.
+			warmUp();
 		} catch (e) {
 			error = `No data found (${e}). Run \`npm run data\` first.`;
 		}
@@ -73,9 +79,13 @@
 		<img src={team.logo} alt="" width="48" height="48" />
 		<div>
 			<h1>{team.name} <span class="muted">{side}</span></h1>
-			<p class="muted">{title}: {question}</p>
+			<p class="muted screen-only">{title}: {question}</p>
+			<p class="print-only">{title} game sheet · {describeFilters(filters)}</p>
 		</div>
-		<label class="switch">
+		<button type="button" class="print screen-only" onclick={() => window.print()}>
+			Print game sheet
+		</button>
+		<label class="switch screen-only">
 			<span class="muted">Opponent</span>
 			<select bind:value={filters.team}>
 				{#each meta.teams as t (t.abbr)}
@@ -85,7 +95,10 @@
 		</label>
 	</div>
 
-	<FilterBar bind:filters seasons={meta.seasons} onreset={resetSituation} />
+	<div class="screen-only">
+		<FilterBar bind:filters seasons={meta.seasons} onreset={resetSituation} />
+		<EngineNotice />
+	</div>
 
 	{@render children(filters)}
 {/if}
@@ -93,8 +106,9 @@
 <style>
 	.head {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 1rem;
+		gap: 0.75rem 1rem;
 		border-left: 4px solid var(--team);
 		padding-left: 1rem;
 		margin-bottom: 1rem;
@@ -107,11 +121,25 @@
 		font-weight: 400;
 		font-size: 1rem;
 	}
+	.head > div {
+		flex: 1 1 14rem;
+		min-width: 0;
+	}
 	.head p {
 		margin: 0.2rem 0 0;
 	}
-	.switch {
+	.print {
 		margin-left: auto;
+		font: inherit;
+		font-size: 0.85rem;
+		padding: 0.35rem 0.7rem;
+		border: 1px solid var(--line);
+		border-radius: 6px;
+		background: var(--card);
+		color: inherit;
+		cursor: pointer;
+	}
+	.switch {
 		display: grid;
 		font-size: 0.75rem;
 	}

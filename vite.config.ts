@@ -11,6 +11,8 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			adapter: adapter(),
+			// All CSS is ~11 kB: inline it instead of three render-blocking requests.
+			inlineStyleThreshold: 16384,
 			// GitHub Pages serves the site under /<repo>; CI sets BASE_PATH=/nfl.
 			paths: { base: (process.env.BASE_PATH ?? '') as '' | `/${string}` }
 		})

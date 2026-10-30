@@ -7,11 +7,22 @@ import mvpWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url
 import ehWasm from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
 import ehWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
 import { asset } from '$app/paths';
+import { writable } from 'svelte/store';
 
-const BUNDLES: duckdb.DuckDBBundles = {
+// Self-hosted copy, used when jsDelivr is unreachable. jsDelivr is preferred:
+// brotli makes the wasm ~15% smaller and it is cached for a year (Pages: 10 min).
+const LOCAL_BUNDLES: duckdb.DuckDBBundles = {
 	mvp: { mainModule: mvpWasm, mainWorker: mvpWorker },
 	eh: { mainModule: ehWasm, mainWorker: ehWorker }
 };
+
+export type EngineState =
+	| { phase: 'idle' | 'ready' }
+	| { phase: 'loading'; bytes: number }
+	| { phase: 'error'; message: string };
+
+/** Query engine download/startup state, for a one-time loading notice. */
+export const engine = writable<EngineState>({ phase: 'idle' });
 
 let conn: Promise<duckdb.AsyncDuckDBConnection> | null = null;
 let db: duckdb.AsyncDuckDB | null = null;
@@ -19,16 +30,68 @@ const loaded = new Set<number>();
 // Serializes view (re)creation and queries on the single connection.
 let queue: Promise<unknown> = Promise.resolve();
 
+/** Download the wasm with progress and hand DuckDB a blob URL, so it is fetched once. */
+async function downloadWasm(url: string): Promise<string> {
+	const res = await fetch(url);
+	if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
+	const reader = res.body.getReader();
+	const chunks: Uint8Array[] = [];
+	let bytes = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		chunks.push(value);
+		bytes += value.length;
+		engine.set({ phase: 'loading', bytes });
+	}
+	return URL.createObjectURL(new Blob(chunks as BlobPart[], { type: 'application/wasm' }));
+}
+
+async function start(source: 'cdn' | 'local'): Promise<duckdb.AsyncDuckDBConnection> {
+	const m = await import('@duckdb/duckdb-wasm');
+	const bundle = await m.selectBundle(source === 'cdn' ? m.getJsDelivrBundles() : LOCAL_BUNDLES);
+	// Browsers refuse cross-origin worker scripts, so wrap the CDN one in a same-origin blob.
+	const workerUrl =
+		source === 'cdn'
+			? URL.createObjectURL(
+					new Blob([`importScripts(${JSON.stringify(bundle.mainWorker)});`], {
+						type: 'text/javascript'
+					})
+				)
+			: bundle.mainWorker!;
+	const wasmUrl = await downloadWasm(bundle.mainModule);
+	const worker = new Worker(workerUrl);
+	try {
+		db = new m.AsyncDuckDB(new m.VoidLogger(), worker);
+		await db.instantiate(wasmUrl, bundle.pthreadWorker);
+		return await db.connect();
+	} catch (e) {
+		worker.terminate();
+		throw e;
+	} finally {
+		URL.revokeObjectURL(wasmUrl);
+	}
+}
+
 function connect(): Promise<duckdb.AsyncDuckDBConnection> {
 	conn ??= (async () => {
-		const { selectBundle, AsyncDuckDB, VoidLogger } = await import('@duckdb/duckdb-wasm');
-		const bundle = await selectBundle(BUNDLES);
-		const worker = new Worker(bundle.mainWorker!);
-		db = new AsyncDuckDB(new VoidLogger(), worker);
-		await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-		return db.connect();
+		engine.set({ phase: 'loading', bytes: 0 });
+		try {
+			const c = await start('cdn').catch(() => start('local'));
+			engine.set({ phase: 'ready' });
+			return c;
+		} catch (e) {
+			conn = null; // allow a retry on the next query
+			engine.set({ phase: 'error', message: String(e) });
+			throw e;
+		}
 	})();
 	return conn;
+}
+
+/** Start downloading the engine early (e.g. while the user picks a team). */
+export function warmUp(): void {
+	connect().catch(() => undefined);
 }
 
 function enqueue<T>(job: () => Promise<T>): Promise<T> {

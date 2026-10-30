@@ -101,15 +101,18 @@
 				subtitle="Inside their 20, ranked among all defenses."
 			/>
 		</div>
-		<WhatWorks {filters} />
-		<RunPassSplit {filters} side="defense" />
+		<!-- Left off the printed game sheet to keep it to about two pages. -->
+		<div class="no-print">
+			<WhatWorks {filters} />
+			<RunPassSplit {filters} side="defense" />
+		</div>
 	{/snippet}
 </Scout>
 
 <style>
 	.pair {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
 		gap: 0 1.25rem;
 	}
 </style>

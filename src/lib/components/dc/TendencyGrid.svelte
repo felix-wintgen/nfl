@@ -46,11 +46,11 @@
 
 	// Cell color: above (orange) or below (blue) league, strength by distance.
 	function shade(c: Compared | undefined): string {
-		if (!c || c.value === null || c.league === null || c.n < 8) return 'transparent';
+		if (!c || c.value === null || c.league === null || c.n < SMALL_SAMPLE) return 'transparent';
 		const scale = metric === 'epa' ? 0.4 : 0.25;
 		const d = Math.max(-1, Math.min(1, (c.value - c.league) / scale));
 		const rgb = d >= 0 ? 'var(--more)' : 'var(--less)';
-		return `rgb(${rgb} / ${(Math.abs(d) * 0.55).toFixed(2)})`;
+		return `rgb(${rgb} / ${(Math.abs(d) * 0.4).toFixed(2)})`;
 	}
 </script>
 
@@ -129,9 +129,6 @@
 		justify-content: space-between;
 		margin: 0.75rem 0;
 	}
-	.scroll {
-		overflow-x: auto;
-	}
 	.grid td {
 		border: 1px solid var(--line);
 		min-width: 6rem;
@@ -145,6 +142,6 @@
 	}
 	.l {
 		font-size: 0.72rem;
-		color: var(--muted);
+		color: var(--muted-strong);
 	}
 </style>

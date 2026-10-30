@@ -61,9 +61,9 @@
 		margin-right: 0.4rem;
 	}
 	.pass {
-		color: rgb(var(--more));
+		color: var(--more-text);
 	}
 	.run {
-		color: rgb(var(--less));
+		color: var(--less-text);
 	}
 </style>

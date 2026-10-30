@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	defaultFilters,
+	describeFilters,
 	parseFilters,
 	serializeFilters,
 	situationWhere,
@@ -113,5 +114,28 @@ describe('teamWhere', () => {
 	it('rejects a missing or malformed team', () => {
 		expect(() => teamWhere(DEFAULTS, 'offense')).toThrow();
 		expect(() => teamWhere(withTeam({ team: "KC' OR 1=1" }), 'offense')).toThrow();
+	});
+});
+
+describe('describeFilters', () => {
+	it('summarizes defaults as the season range', () => {
+		expect(describeFilters(DEFAULTS)).toBe('2025–2026');
+	});
+
+	it('lists every active filter', () => {
+		const f = withTeam({
+			seasons: [2022, 2024],
+			games: 'last4',
+			seasonType: 'REG',
+			downs: [3, 4],
+			dist: ['1-2'],
+			zones: ['red zone'],
+			score: ['one score'],
+			clock: 'two_min',
+			venue: 'away'
+		});
+		expect(describeFilters(f)).toBe(
+			'2022, 2024 · last 4 games · regular season · 3rd/4th down · 1-2 to go · red zone · one score · two-minute · away'
+		);
 	});
 });
