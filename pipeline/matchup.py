@@ -430,6 +430,9 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
     pending = {t for t, d in gameday.items() if report_pending(t in with_status, d, today)}
     last_week = {t: max((g["week"] for g in sched if g["week"] < week and t in (g["home_team"], g["away_team"])), default=None)
                  for t in gameday}
+    # Once a game is played, "questionable" and "doubtful" are answered: keep only who was ruled out.
+    done = {t for g in games if g["home_score"] is not None for t in (g["home_team"], g["away_team"])}
+    injuries = {pid: r for pid, r in injuries.items() if r["team"] not in done or r["report_status"] == "Out"}
 
     # Ruled out in one of the last three weeks: a QB coming back from that gets his job back.
     recently_out = set()
