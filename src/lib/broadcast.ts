@@ -300,11 +300,13 @@ export function outLine(o: OutPlayer): string {
 	const usage =
 		o.dropbacks !== null && o.dropbacks >= 30
 			? `${o.dropbacks} dropbacks this season`
-			: o.target_share !== null && o.target_share >= (o.carry_share ?? 0)
-				? `${p(o.target_share)} of the targets`
-				: o.carry_share !== null
-					? `${p(o.carry_share)} of the RB carries`
-					: '';
+			: o.by_snaps && o.snap_share
+				? `${p(o.snap_share)} of the offensive snaps`
+				: o.target_share !== null && o.target_share >= (o.carry_share ?? 0)
+					? `${p(o.target_share)} of the targets`
+					: o.carry_share !== null
+						? `${p(o.carry_share)} of the RB carries`
+						: '';
 	const what = [role ? `their ${role}` : null, usage].filter(Boolean).join(', ');
 	const next = o.next ? ` Next in line: ${o.next.name} (${p(o.next.share)}).` : '';
 	return `${what}${o.injury ? ` · ${o.injury.toLowerCase()}` : ''}.${next}`;

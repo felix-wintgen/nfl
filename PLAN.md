@@ -226,6 +226,8 @@ Shares count only the games a player was active for (weekly roster, or he touche
 
 Before a team's final injury report (Friday for Sunday games, Saturday for Monday), nobody has a game status, so the board showed everyone as healthy: 2022–2025, about 0.6 board players per team-week ended up inactive. Until the report is out, players get "Missed last game", "Did not practice" or "Limited in practice". Carrying last week's status forward alone is a coin flip (52% sat again: 98% if still not practicing, 3% if practicing fully); with practice status it catches 79% of the inactive players. The report counts as out once any player on the team has a game status, or from the day before kickoff.
 
+Who's out lists players with 8%+ of the targets or carries, or 40%+ of the offensive snaps: blocking tight ends and fullbacks barely show in touches (week 8, 2026: Kmet, Smythe, Oliver, Bates). No next in line for them: 2022–2025, the teammate with the most snaps below him gained the most snaps only 37% of the time (chance: 33%).
+
 Early season (weeks 1–3): too little data, so fall back to last season's usage, labelled "last season".
 
 ### 7.3 Data

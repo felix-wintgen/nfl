@@ -382,11 +382,29 @@ def practice(status: Optional[str]) -> Optional[str]:
 
 OUT_STATUSES = ("Out", "Doubtful")
 POSITIONS = ("QB", "RB", "FB", "WR", "TE")
+# Who's out lists a player who mattered: a real share of the targets or carries,
+# or (for blocking tight ends, fullbacks and depth receivers, whose job barely
+# shows in touches) a big share of the offensive snaps.
+OUT_TOUCH_BAR = 0.08
+OUT_SNAP_BAR = 0.40
+
+
+def snap_shares(con: duckdb.DuckDBPyConnection, snaps_file: Path, roster_file: Path,
+                season: int, week: int) -> Dict[str, float]:
+    """Season-to-date share of the offensive snaps, averaged over the games a player
+    appeared in, by gsis id. PFR snap counts join through the roster's pfr_id."""
+    return {r["id"]: r["share"] for r in _rows(con, f"""
+        WITH ids AS (SELECT DISTINCT pfr_id, gsis_id FROM read_parquet('{roster_file}')
+                     WHERE pfr_id IS NOT NULL AND gsis_id IS NOT NULL)
+        SELECT ids.gsis_id AS id, avg(s.offense_pct) AS share
+        FROM read_parquet('{snaps_file}') s JOIN ids ON ids.pfr_id = s.pfr_player_id
+        WHERE s.season = {season} AND s.week < {week}
+        GROUP BY 1""")}
 
 
 def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
           games_file: Path, roster_file: Optional[Path], injuries_file: Optional[Path],
-          today: Optional[date] = None) -> Optional[Dict]:
+          today: Optional[date] = None, snaps_file: Optional[Path] = None) -> Optional[Dict]:
     today = today or datetime.now(timezone.utc).date()
     sched = _rows(con, f"SELECT * FROM read_parquet('{games_file}') WHERE season = {season}")
     open_weeks = [g["week"] for g in sched if g["result"] is None and g["home_score"] is None]
@@ -440,6 +458,8 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         recently_out = {r["gsis_id"] for r in _rows(con, f"""
             SELECT DISTINCT gsis_id FROM read_parquet('{injuries_file}')
             WHERE week BETWEEN {week - 3} AND {week - 1} AND report_status = 'Out'""")}
+
+    snaps = snap_shares(con, snaps_file, roster_file, season, week) if snaps_file and roster_file else {}
 
     u = usage(con, files, season, week)
     stats = player_stats(u, positions, availability(con, roster_file, injuries_file) if roster_file else None)
@@ -568,11 +588,15 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
                 continue
             t, b, q = s["targets"].get(pid), s["backs"].get(pid), s["qbs"].get(pid)
             share = max(t["share"] if t else 0, b["rb_share"] if b else 0)
-            if not (q and q["dropbacks"] >= 30) and share < 0.08:
+            snap = snaps.get(pid, 0.0)
+            qb_role = bool(q and q["dropbacks"] >= 30)
+            by_snaps = not qb_role and share < OUT_TOUCH_BAR and snap >= OUT_SNAP_BAR
+            if not qb_role and share < OUT_TOUCH_BAR and not by_snaps:
                 continue
             item = {**person(pid), "status": inj["report_status"] if inj else "Injured reserve",
                     "target_share": t["share"] if t else None, "carry_share": b["rb_share"] if b else None,
                     "dropbacks": q["dropbacks"] if q else None,
+                    "snap_share": snap or None, "by_snaps": by_snaps,
                     "labels": [l for g in ("qbs", "targets", "backs") for l in held.get((team, g, pid), [])]}
             # Who's next in line for an absent go-to guy or workhorse.
             if item["status"] in ("Out", "Injured reserve"):

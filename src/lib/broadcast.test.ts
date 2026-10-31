@@ -98,6 +98,21 @@ describe('lines', () => {
 			'their go-to guy, 27% of the targets · ankle. Next in line: Rome Odunze (18%).'
 		);
 	});
+
+	it('describes a blocker listed for his snaps', () => {
+		const o = {
+			...person,
+			status: 'Injured reserve',
+			injury: 'Knee',
+			target_share: 0.06,
+			carry_share: null,
+			dropbacks: null,
+			snap_share: 0.61,
+			by_snaps: true,
+			labels: []
+		};
+		expect(outLine(o)).toBe('61% of the offensive snaps · knee.');
+	});
 });
 
 describe('tags', () => {

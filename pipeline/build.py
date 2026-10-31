@@ -279,12 +279,13 @@ def build_matchups(con: duckdb.DuckDBPyConnection, season: int, refresh: bool) -
     games = download("schedules", "games.parquet", refresh)
     roster = download("weekly_rosters", f"roster_weekly_{season}.parquet", refresh)
     injuries = download("injuries", f"injuries_{season}.parquet", refresh)
+    snaps = download("snap_counts", f"snap_counts_{season}.parquet", refresh)
     stale = OUT / "matchups.json"
     if roster is None:  # positions and jersey numbers come from it; the boards would be empty
         stale.unlink(missing_ok=True)
         print(f"  matchups: skipped, no roster file for {season}")
         return
-    res = matchup.build(con, OUT, season, games, roster, injuries)
+    res = matchup.build(con, OUT, season, games, roster, injuries, snaps_file=snaps)
     if res is None:
         stale.unlink(missing_ok=True)
         print("  matchups: no upcoming games")

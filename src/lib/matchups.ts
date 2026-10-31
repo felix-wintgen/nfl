@@ -76,6 +76,10 @@ export interface OutPlayer extends Person {
 	target_share: number | null;
 	carry_share: number | null;
 	dropbacks: number | null;
+	/** Share of the offensive snaps in the games he played. */
+	snap_share?: number | null;
+	/** Listed for his snaps alone (a blocker), not for targets or carries. */
+	by_snaps?: boolean;
 	labels: string[];
 	next?: { name: string; share: number };
 }
