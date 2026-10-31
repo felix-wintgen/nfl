@@ -7,12 +7,12 @@
 		qbLine,
 		qbSecondLine,
 		statusKey,
-		statusTag,
+		healthTags,
 		tags,
 		targetLine,
 		teamLine
 	} from '#lib/broadcast.ts';
-	import type { Board, Person } from '#lib/matchups.ts';
+	import type { Board } from '#lib/matchups.ts';
 	import type { Team } from '#lib/meta.ts';
 	import Tag from './Tag.svelte';
 
@@ -37,8 +37,6 @@
 		fresh.includes(tag) ||
 		(tag === 'three_down' && fresh.some((l) => l === 'workhorse' || l === 'passing_down'));
 
-	const status = (p: Person) => statusTag(p.status);
-
 	const scout = (path: '/dc' | '/oc', abbr: string) =>
 		`${resolve(path)}?team=${abbr}&seasons=${season}`;
 </script>
@@ -58,7 +56,7 @@
 				<div class="who">
 					<strong>{q.name}</strong> <span class="pos">QB</span>
 					{#if q.rookie}<Tag key="rookie" />{/if}
-					{#if status(q)}<Tag key={status(q)!} tone="warn" />{/if}
+					{#each healthTags(q) as h (h.key)}<Tag key={h.key} tone={h.tone} />{/each}
 					{#if q.returning}<Tag key="returning" tone="back" />
 					{:else if q.changed}<Tag key="changed" tone="back" />{/if}
 					{#each tags(q.labels) as l (l)}
@@ -82,7 +80,7 @@
 				<div class="who">
 					<strong>{t.name}</strong> <span class="pos">{t.pos}</span>
 					{#if t.rookie}<Tag key="rookie" />{/if}
-					{#if status(t)}<Tag key={status(t)!} tone="warn" />{/if}
+					{#each healthTags(t) as h (h.key)}<Tag key={h.key} tone={h.tone} />{/each}
 					{#each tags(t.labels) as l (l)}
 						<Tag key={l} fresh={isNew(l, t.new)} />
 					{/each}
@@ -104,7 +102,7 @@
 				<div class="who">
 					<strong>{b.name}</strong> <span class="pos">{b.pos}</span>
 					{#if b.rookie}<Tag key="rookie" />{/if}
-					{#if status(b)}<Tag key={status(b)!} tone="warn" />{/if}
+					{#each healthTags(b) as h (h.key)}<Tag key={h.key} tone={h.tone} />{/each}
 					{#each tags(b.labels, i === 0 && board.backfield === 'lead') as l (l)}
 						<Tag key={l} fresh={isNew(l, b.new)} />
 					{/each}
@@ -135,6 +133,12 @@
 				</li>
 			{/each}
 		</ul>
+	{/if}
+
+	{#if board.report_pending}
+		<p class="pending muted">
+			Final injury report not out yet: tags show last game and this week's practice.
+		</p>
 	{/if}
 
 	<p class="links screen-only">
@@ -224,6 +228,10 @@
 		flex-wrap: wrap;
 		gap: 0.3rem 0.4rem;
 		align-items: baseline;
+	}
+	.pending {
+		margin: 0.75rem 0 0;
+		font-size: 0.8rem;
 	}
 	.links {
 		margin: 1rem 0 0;

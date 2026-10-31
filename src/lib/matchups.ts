@@ -11,6 +11,9 @@ export interface Person {
 	/** Injury report status this week ("Questionable", "Doubtful" …), if listed. */
 	status: string | null;
 	injury: string | null;
+	/** Until the team's final injury report is out: this week's practice and whether he missed last game. */
+	practice: 'dnp' | 'limited' | null;
+	missed_last: boolean;
 }
 
 export interface QbStats {
@@ -93,6 +96,8 @@ export interface Board {
 	backs: Player<BackStats>[];
 	backfield: 'workhorse' | 'lead' | 'committee';
 	out: OutPlayer[];
+	/** The team's final injury report (game statuses) isn't out yet. */
+	report_pending: boolean;
 }
 
 export interface Game {

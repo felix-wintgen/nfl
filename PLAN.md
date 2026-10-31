@@ -224,6 +224,8 @@ Broadcast lines are templates with 2–3 variants per label (no LLM), e.g. _"Smi
 
 Shares count only the games a player was active for (weekly roster, or he touched the ball): a missed game is missing data, not zero targets. "On the rise" skips games he missed injured but counts healthy scratches as zero, so a player coming back from injury doesn't "rise". Replaying 2022–2026 both ways: only players who missed games change; labels fire 4–15 points more often (go-to guy for 74% of team-weeks instead of 59%), every label flips less, and the bars stay as they were. Raising them to the old frequencies would take labels from healthy players (Henry 2023, Hill 2024), so they weren't raised.
 
+Before a team's final injury report (Friday for Sunday games, Saturday for Monday), nobody has a game status, so the board showed everyone as healthy: 2022–2025, about 0.6 board players per team-week ended up inactive. Until the report is out, players get "Missed last game", "Did not practice" or "Limited in practice". Carrying last week's status forward alone is a coin flip (52% sat again: 98% if still not practicing, 3% if practicing fully); with practice status it catches 79% of the inactive players. The report counts as out once any player on the team has a game status, or from the day before kickoff.
+
 Early season (weeks 1–3): too little data, so fall back to last season's usage, labelled "last season".
 
 ### 7.3 Data

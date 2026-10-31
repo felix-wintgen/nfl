@@ -2,7 +2,7 @@
 // labels (pipeline/matchup.py); this file only words them. Each label has a
 // few variants, picked at random: the wording changes, the facts don't.
 import { ordinal } from './format';
-import type { BackStats, Board, OutPlayer, Player, QbStats, TargetStats } from './matchups';
+import type { BackStats, Board, OutPlayer, Person, Player, QbStats, TargetStats } from './matchups';
 
 export type Rng = () => number;
 
@@ -29,7 +29,10 @@ export const LABELS: Record<string, string> = {
 	questionable: 'Questionable',
 	doubtful: 'Doubtful',
 	out: 'Out',
-	injured_reserve: 'Injured reserve'
+	injured_reserve: 'Injured reserve',
+	missed_last: 'Missed last game',
+	dnp: 'Did not practice',
+	limited: 'Limited in practice'
 };
 
 /** What each tag means, in plain words; the bars match pipeline/matchup.py. Order = legend order. */
@@ -57,23 +60,38 @@ export const ABOUT: Record<string, string> = {
 	questionable: "On this week's injury report as questionable: may or may not play.",
 	doubtful: "On this week's injury report as doubtful: unlikely to play.",
 	out: 'Ruled out for this game.',
-	injured_reserve: 'On injured reserve: out for at least several weeks.'
+	injured_reserve: 'On injured reserve: out for at least several weeks.',
+	// Shown only until the final injury report; rates from 2022–2025 (last practice day of the week).
+	missed_last:
+		"Ruled out or inactive for his team's last game; this week's final injury report isn't out yet. Such players sat again 52% of the time: 98% when still not practicing, 3% when practicing fully.",
+	dnp: "Didn't practice this week; the final injury report isn't out yet. Such players sat 75% of the time, 98% if they also missed the last game.",
+	limited:
+		"Limited in practice this week; the final injury report isn't out yet. Such players sat 25% of the time."
 };
 
 /** "Injured reserve" → "injured_reserve", the key for LABELS and ABOUT. */
 export const statusKey = (status: string) => status.toLowerCase().replaceAll(' ', '_');
 
-/** The injury tag next to a name: questionable or doubtful (players ruled out are under "Who's out"). */
-export const statusTag = (status: string | null) =>
-	status === 'Questionable' || status === 'Doubtful' ? statusKey(status) : null;
+/**
+ * Health tags next to a name: questionable or doubtful (players ruled out are under
+ * "Who's out"), and before the final report, last game and practice.
+ */
+export function healthTags(p: Person): { key: string; tone?: 'warn' }[] {
+	const out: { key: string; tone?: 'warn' }[] = [];
+	if (p.status === 'Questionable' || p.status === 'Doubtful')
+		out.push({ key: statusKey(p.status), tone: 'warn' });
+	if (p.missed_last) out.push({ key: 'missed_last', tone: 'warn' });
+	if (p.practice === 'dnp') out.push({ key: 'dnp', tone: 'warn' });
+	if (p.practice === 'limited') out.push({ key: 'limited' });
+	return out;
+}
 
 /** Every tag a board shows, in legend order. */
 export function boardTags(b: Board): string[] {
 	const used = new Set<string>();
-	const person = (p: { rookie: boolean; status: string | null }) => {
+	const person = (p: Person) => {
 		if (p.rookie) used.add('rookie');
-		const s = statusTag(p.status);
-		if (s) used.add(s);
+		healthTags(p).forEach((t) => used.add(t.key));
 	};
 	if (b.qb) {
 		person(b.qb);

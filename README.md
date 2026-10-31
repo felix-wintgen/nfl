@@ -27,7 +27,7 @@ Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-dow
 
 ## Game day
 
-`/matchup` is a spotting board for the upcoming week: the line, both offenses' QB, top targets and backfield with role labels ("go-to guy", "workhorse" …) and who's out. `pipeline/matchup.py` writes `static/data/matchups.json` from this season's usage (counting only the games each player was active for) plus nflverse rosters and injury reports; the labels are sticky (earned at one bar, kept until clearly below a lower one). `src/lib/broadcast.ts` words them, with a few random variants per label.
+`/matchup` is a spotting board for the upcoming week: the line, both offenses' QB, top targets and backfield with role labels ("go-to guy", "workhorse" …) and who's out. Until a team's final injury report is out, players show whether they missed the last game and how they practiced. `pipeline/matchup.py` writes `static/data/matchups.json` from this season's usage (counting only the games each player was active for) plus nflverse rosters and injury reports; the labels are sticky (earned at one bar, kept until clearly below a lower one). `src/lib/broadcast.ts` words them, with a few random variants per label.
 
 ## Known data gaps
 

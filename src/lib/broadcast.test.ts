@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/paths', () => ({ asset: (p: string) => p }));
-const { ABOUT, LABELS, backLine, boardTags, mainLabel, outLine, targetLine, teamLine } =
+const { ABOUT, LABELS, backLine, boardTags, healthTags, mainLabel, outLine, targetLine, teamLine } =
 	await import('./broadcast.ts');
 const { favorite, kickoff, nextGame } = await import('./matchups.ts');
 
@@ -13,7 +13,9 @@ const person = {
 	pos: 'WR',
 	rookie: false,
 	status: null,
-	injury: null
+	injury: null,
+	practice: null,
+	missed_last: false
 };
 const tstats = {
 	targets: 78,
@@ -101,6 +103,15 @@ describe('lines', () => {
 describe('tags', () => {
 	it('explains every tag it can show', () => {
 		for (const k of Object.keys(ABOUT)) expect(LABELS[k], k).toBeTruthy();
+	});
+
+	it('shows last game and practice before the final report', () => {
+		const p = { ...person, missed_last: true, practice: 'dnp' as const };
+		expect(healthTags(p).map((t) => t.key)).toEqual(['missed_last', 'dnp']);
+		expect(healthTags({ ...person, status: 'Questionable' })).toEqual([
+			{ key: 'questionable', tone: 'warn' }
+		]);
+		expect(healthTags({ ...person, status: 'Out' })).toEqual([]); // under "Who's out" instead
 	});
 
 	it("lists a board's tags in legend order, statuses included", () => {

@@ -15,8 +15,9 @@ flicker between weeks.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Callable, Dict, List, NamedTuple, Optional, Set, Tuple
 
 import duckdb
@@ -364,6 +365,19 @@ def replay(stats: Dict[Tuple[int, str], Dict[str, Dict]], week: int) -> Tuple[Di
     return held, prev
 
 
+def report_pending(has_status: bool, gameday: date, today: date) -> bool:
+    """The team's final injury report isn't out yet: none of its players has a game status,
+    and it's more than a day before kickoff (the report comes the day before, Friday for Sunday)."""
+    return not has_status and today < gameday - timedelta(days=1)
+
+
+def practice(status: Optional[str]) -> Optional[str]:
+    """'dnp' / 'limited' from the injury report's practice status; None for full or no practice listed."""
+    if not status:
+        return None
+    return "dnp" if status.startswith("Did Not") else "limited" if status.startswith("Limited") else None
+
+
 # ---------------------------------------------------------------------------
 
 OUT_STATUSES = ("Out", "Doubtful")
@@ -371,7 +385,9 @@ POSITIONS = ("QB", "RB", "FB", "WR", "TE")
 
 
 def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
-          games_file: Path, roster_file: Optional[Path], injuries_file: Optional[Path]) -> Optional[Dict]:
+          games_file: Path, roster_file: Optional[Path], injuries_file: Optional[Path],
+          today: Optional[date] = None) -> Optional[Dict]:
+    today = today or datetime.now(timezone.utc).date()
     sched = _rows(con, f"SELECT * FROM read_parquet('{games_file}') WHERE season = {season}")
     open_weeks = [g["week"] for g in sched if g["result"] is None and g["home_score"] is None]
     if not open_weeks:
@@ -393,12 +409,27 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
     positions = {pid: r["position"] for pid, r in roster.items()}
     # Players no longer on a roster keep their pbp position guess: none, so they drop out of groups.
 
-    injuries: Dict[str, Dict] = {}
+    injuries: Dict[str, Dict] = {}  # this week's game statuses
+    listed: Dict[str, Dict] = {}    # everyone on this week's report, with or without one
+    missed: Set[Tuple[str, int]] = set()  # (id, week): ruled out, or inactive on game day
     if injuries_file:
         for r in _rows(con, f"""
             SELECT * FROM read_parquet('{injuries_file}')
-            WHERE week = {week} AND report_status IS NOT NULL AND position IN {POSITIONS}"""):
-            injuries[r["gsis_id"]] = r
+            WHERE week = {week} AND position IN {POSITIONS}"""):
+            listed[r["gsis_id"]] = r
+            if r["report_status"] is not None:
+                injuries[r["gsis_id"]] = r
+        missed = {(r["gsis_id"], r["week"]) for r in _rows(con, f"""
+            SELECT gsis_id, week FROM read_parquet('{injuries_file}') WHERE report_status IN {OUT_STATUSES}""")}
+    if roster_file:
+        missed |= {(r["gsis_id"], r["week"]) for r in _rows(con, f"""
+            SELECT gsis_id, week FROM read_parquet('{roster_file}') WHERE status = 'INA'""")}
+    # Until a team's final report is out, the board shows last game and practice instead.
+    with_status = {r["team"] for r in injuries.values()}
+    gameday = {t: date.fromisoformat(str(g["gameday"])) for g in games for t in (g["home_team"], g["away_team"])}
+    pending = {t for t, d in gameday.items() if report_pending(t in with_status, d, today)}
+    last_week = {t: max((g["week"] for g in sched if g["week"] < week and t in (g["home_team"], g["away_team"])), default=None)
+                 for t in gameday}
 
     # Ruled out in one of the last three weeks: a QB coming back from that gets his job back.
     recently_out = set()
@@ -442,6 +473,9 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
     def person(pid: str, short: Optional[str] = None) -> Dict:
         r = roster.get(pid, {})
         inj = injuries.get(pid)
+        rep = listed.get(pid) or {}
+        team = r.get("team")
+        early = team in pending
         first = r.get("football_name") or r.get("first_name") or ""
         return {
             "id": pid,
@@ -451,7 +485,10 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             "pos": r.get("position"),
             "rookie": r.get("rookie_year") == season,
             "status": inj["report_status"] if inj else None,
-            "injury": (inj.get("report_primary_injury") if inj else None),
+            "injury": rep.get("report_primary_injury") or rep.get("practice_primary_injury"),
+            # Before the final report only: what the board knows instead of a game status.
+            "practice": practice(rep.get("practice_status")) if early and rep.get("team") == team else None,
+            "missed_last": early and (pid, last_week.get(team)) in missed,
         }
 
     def unavailable(pid: str, team: str) -> bool:
@@ -547,6 +584,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             "early_pass_rank": ctx.get("early_pass_rank"), "teams": ctx.get("teams"),
             "games": len([g for g in played if team in (g["home_team"], g["away_team"])]),
             "qb": qb, "targets": targets, "backs": backs, "backfield": backfield, "out": out,
+            "report_pending": team in pending,
         }
 
     result = {"season": season, "week": week, "games": []}

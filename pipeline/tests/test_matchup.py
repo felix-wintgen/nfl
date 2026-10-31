@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from matchup import (
@@ -11,7 +13,9 @@ from matchup import (
     implied_scores,
     on_the_rise,
     player_stats,
+    practice,
     record,
+    report_pending,
     replay,
     win_prob,
 )
@@ -115,6 +119,22 @@ def test_no_rise_from_coming_back_from_injury():
     # A healthy scratch is different: he wasn't in the plan, now he is.
     scratch = Availability(active, hurt=set())
     assert on_the_rise(player_stats(u, {}, scratch)[(w, "LA")]["targets"]["p"])
+
+
+@pytest.mark.parametrize("has_status, today, pending", [
+    (False, date(2026, 10, 30), True),   # Friday morning, Monday game: report not out
+    (False, date(2026, 11, 1), False),   # Sunday: Saturday's report is out, even with no statuses
+    (True, date(2026, 10, 30), False),   # a game status on the team means the report is out
+])
+def test_final_report_is_pending_until_the_day_before(has_status, today, pending):
+    assert report_pending(has_status, date(2026, 11, 2), today) is pending
+
+
+def test_practice_status():
+    assert practice("Did Not Participate In Practice") == "dnp"
+    assert practice("Limited Participation in Practice") == "limited"
+    assert practice("Full Participation in Practice") is None
+    assert practice(None) is None
 
 
 @pytest.mark.parametrize("spread, total, expected", [
