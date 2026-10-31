@@ -5,7 +5,8 @@ top targets and backfield with role labels, and who's out. Writes
 static/data/matchups.json; the matchup page turns labels into broadcast lines.
 
 Labels rest on usage (targets, air yards, carries), which carries over from
-game to game; efficiency per touch barely does. They are sticky: the season
+game to game; efficiency per touch barely does. Shares count only the games a
+player was active for: a missed game is missing data, not a game with zero targets. They are sticky: the season
 is replayed week by week, and a label, once earned, stays until the player
 falls clearly below the bar, so a player hovering at a threshold doesn't
 flicker between weeks.
@@ -15,12 +16,20 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from collections import defaultdict
+from typing import Callable, Dict, List, NamedTuple, Optional, Set, Tuple
 
 import duckdb
 
 Stats = Dict[str, float]
 Rule = Tuple[str, Callable[[Stats], bool], Callable[[Stats], bool]]
+
+
+class Availability(NamedTuple):
+    """Who could play when. A player is active for a game if the weekly roster has
+    him active for that team or he touched the ball in it."""
+    active: Set[Tuple[str, str, int]]  # (id, team, week) on the active roster
+    hurt: Set[Tuple[str, int]]         # (id, week) on the injury report or injured reserve
 
 # (label, enter, stay). Earlier labels win when a player qualifies for several.
 TARGET_RULES: List[Rule] = [
@@ -174,6 +183,20 @@ recent AS (  -- targets in the team's last 3 games before week w
       ON l.w = w.w AND l.team = p.posteam AND l.game_id = p.game_id
     WHERE p.is_pass AND p.receiver_player_id IS NOT NULL
     GROUP BY ALL
+),
+per_game AS (  -- each player's usage per game: team totals for the weeks he was active
+    SELECT posteam AS team, week, id, count(*) FILTER (WHERE kind = 'tg') AS targets,
+           sum(ay) AS ay, sum(rz) AS rz_targets, sum(third) AS third_targets,
+           count(*) FILTER (WHERE kind = 'ru') AS carries, sum(i5) AS inside5
+    FROM (
+        SELECT posteam, week, receiver_player_id AS id, 'tg' AS kind, air_yards AS ay,
+               (field_zone IN ('red zone', 'goal to go'))::INT AS rz, (down = 3)::INT AS third, 0 AS i5
+        FROM p WHERE is_pass AND receiver_player_id IS NOT NULL
+        UNION ALL
+        SELECT posteam, week, rusher_player_id, 'ru', 0, 0, 0, (yardline_100 <= 5)::INT
+        FROM p WHERE NOT is_pass AND rusher_player_id IS NOT NULL
+    )
+    GROUP BY ALL
 )
 """
 
@@ -185,19 +208,31 @@ def _rows(con: duckdb.DuckDBPyConnection, sql: str) -> List[Dict]:
 
 
 def usage(con: duckdb.DuckDBPyConnection, files: List[str], season: int, week: int) -> Dict[str, List[Dict]]:
-    """Per-week season-to-date usage tables: target, rush, qb, plus team totals."""
+    """Per-week season-to-date usage tables: target, rush, qb, team games, and per-game usage."""
     head = PLAYER_SQL.format(files=files, season=season, week=week)
     out = {
         "target": _rows(con, head + "SELECT tg.*, coalesce(recent.t3, 0) AS t3 FROM tg LEFT JOIN recent USING (w, team, id)"),
         "rush": _rows(con, head + "SELECT * FROM ru"),
         "qb": _rows(con, head + "SELECT * FROM qb"),
-        # Team targets in the last 3 games, for the "on the rise" share.
-        "t3": _rows(con, head + "SELECT w, team, sum(t3) AS t3 FROM recent GROUP BY ALL"),
         "games": _rows(con, head + """
             SELECT w.w, p.posteam AS team, count(DISTINCT p.game_id) AS games
             FROM weeks w JOIN p ON p.week < w.w GROUP BY ALL"""),
+        "per_game": _rows(con, head + "SELECT * FROM per_game"),
     }
     return out
+
+
+def availability(con: duckdb.DuckDBPyConnection, roster_file: Path, injuries_file: Optional[Path]) -> Availability:
+    """Season-long availability from the weekly rosters and injury reports."""
+    active = {(r["gsis_id"], r["team"], r["week"]) for r in _rows(con, f"""
+        SELECT gsis_id, team, week FROM read_parquet('{roster_file}') WHERE status = 'ACT'""")}
+    # Any injury listing counts: a "Questionable" player ruled inactive on game day is still hurt.
+    hurt = {(r["gsis_id"], r["week"]) for r in _rows(con, f"""
+        SELECT gsis_id, week FROM read_parquet('{roster_file}') WHERE status = 'RES'""")}
+    if injuries_file:
+        hurt |= {(r["gsis_id"], r["week"]) for r in _rows(con, f"""
+            SELECT gsis_id, week FROM read_parquet('{injuries_file}') WHERE report_status IS NOT NULL""")}
+    return Availability(active, hurt)
 
 
 def _by(rows: List[Dict], *keys: str) -> Dict:
@@ -207,49 +242,84 @@ def _by(rows: List[Dict], *keys: str) -> Dict:
     return out
 
 
-def player_stats(u: Dict[str, List[Dict]], positions: Dict[str, str]) -> Dict[Tuple[int, str], Dict[str, Dict]]:
-    """{(week, team): {"targets": {id: stats}, "backs": {id: stats}, "qbs": {id: stats}}}."""
+def player_stats(u: Dict[str, List[Dict]], positions: Dict[str, str],
+                 avail: Optional[Availability] = None) -> Dict[Tuple[int, str], Dict[str, Dict]]:
+    """{(week, team): {"targets": {id: stats}, "backs": {id: stats}, "qbs": {id: stats}}}.
+
+    Shares divide by the team's totals in the games the player was active for
+    (without `avail`: every game). "On the rise" compares windows without the
+    games he missed injured; a healthy scratch still counts as a game with no targets.
+    """
     out: Dict[Tuple[int, str], Dict[str, Dict]] = {}
     games = {(r["w"], r["team"]): r["games"] for r in u["games"]}
-    t3_team = {(r["w"], r["team"]): r["t3"] for r in u["t3"]}
+
+    totals: Dict[Tuple[str, int], Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    touched = set()
+    for r in u["per_game"]:
+        t = totals[(r["team"], r["week"])]
+        touched.add((r["id"], r["team"], r["week"]))
+        t["targets"] += r["targets"]
+        t["ay"] += r["ay"] or 0
+        t["rz"] += r["rz_targets"]
+        t["third"] += r["third_targets"]
+        if positions.get(r["id"]) in ("RB", "FB"):
+            t["rb_carries"] += r["carries"]
+            t["rb_inside5"] += r["inside5"]
+            t["rb_third"] += r["third_targets"]
+    team_weeks: Dict[str, List[int]] = defaultdict(list)
+    for team, wk in sorted(totals):
+        team_weeks[team].append(wk)
+
+    def active(pid: str, team: str, wk: int) -> bool:
+        return avail is None or (pid, team, wk) in avail.active or (pid, team, wk) in touched
+
+    def total(team: str, weeks: List[int], key: str) -> float:
+        return sum(totals[(team, wk)][key] for wk in weeks)
+
+    def share(part: float, team: str, weeks: List[int], key: str) -> float:
+        n = total(team, weeks, key)
+        return (part or 0) / n if n > 0 else 0.0
 
     for (w, team), rows in _by(u["target"], "w", "team").items():
-        n = sum(r["targets"] for r in rows)
-        ay = sum(r["ay"] or 0 for r in rows)
-        rz = sum(r["rz_targets"] for r in rows)
-        third = sum(r["third_targets"] for r in rows)
-        t3 = t3_team.get((w, team)) or 0
+        weeks = [wk for wk in team_weeks[team] if wk < w]
+        recent = weeks[-3:]
         d = out.setdefault((w, team), {"targets": {}, "backs": {}, "qbs": {}})
         for r in rows:
-            early_n, early_t = n - t3, r["targets"] - r["t3"]
-            d["targets"][r["id"]] = {
-                "pos": positions.get(r["id"], ""),
-                "targets": r["targets"], "share": r["targets"] / n,
-                "ay_share": (r["ay"] or 0) / ay if ay > 0 else 0.0,
+            pid = r["id"]
+            on = [wk for wk in weeks if active(pid, team, wk)]
+            healthy = [wk for wk in weeks if active(pid, team, wk) or avail is None or (pid, wk) not in avail.hurt]
+            last3 = [wk for wk in healthy if wk in recent]
+            early = [wk for wk in healthy if wk not in recent]
+            last3_share = share(r["t3"], team, last3, "targets")
+            d["targets"][pid] = {
+                "pos": positions.get(pid, ""),
+                "targets": r["targets"], "share": share(r["targets"], team, on, "targets"),
+                "ay_share": share(r["ay"], team, on, "ay"),
                 "adot": (r["ay"] or 0) / r["targets"],
-                "rz_targets": r["rz_targets"], "rz_share": r["rz_targets"] / rz if rz else 0.0,
-                "third_share": r["third_targets"] / third if third else 0.0,
+                "rz_targets": r["rz_targets"], "rz_share": share(r["rz_targets"], team, on, "rz"),
+                "third_share": share(r["third_targets"], team, on, "third"),
                 "third_targets": r["third_targets"],
                 "rec": r["rec"], "rec_yards": r["rec_yards"], "rec_td": r["rec_td"],
                 "games": games.get((w, team), 0),
-                "last3_share": r["t3"] / t3 if t3 else 0.0,
-                "early_share": early_t / early_n if early_n > 0 else 0.0,
+                "last3_share": last3_share,
+                # No earlier games to compare with (all missed injured): no rise either.
+                "early_share": share(r["targets"] - r["t3"], team, early, "targets") if early else last3_share,
             }
 
     for (w, team), rows in _by(u["rush"], "w", "team").items():
+        weeks = [wk for wk in team_weeks[team] if wk < w]
         d = out.setdefault((w, team), {"targets": {}, "backs": {}, "qbs": {}})
-        backs = [r for r in rows if positions.get(r["id"]) in ("RB", "FB")]
-        n = sum(r["carries"] for r in backs)
-        i5 = sum(r["inside5"] for r in backs)
-        rb_third = sum(d["targets"].get(r["id"], {}).get("third_targets", 0) for r in backs)
-        for r in backs:
+        for r in rows:
+            if positions.get(r["id"]) not in ("RB", "FB"):
+                continue
+            on = [wk for wk in weeks if active(r["id"], team, wk)]
             t = d["targets"].get(r["id"], {})
             d["backs"][r["id"]] = {
                 "carries": r["carries"], "rush_yards": r["rush_yards"], "rush_td": r["rush_td"],
-                "rb_share": r["carries"] / n if n else 0.0,
-                "inside5": r["inside5"], "inside5_share": r["inside5"] / i5 if i5 else 0.0,
+                "rb_share": share(r["carries"], team, on, "rb_carries"),
+                "inside5": r["inside5"], "inside5_share": share(r["inside5"], team, on, "rb_inside5"),
                 "targets": t.get("targets", 0), "rec_yards": t.get("rec_yards", 0),
-                "rb_third_share": t.get("third_targets", 0) / rb_third if rb_third else 0.0,
+                "rb_third_share": share(t.get("third_targets", 0), team, on, "rb_third"),
                 "games": games.get((w, team), 0),
             }
 
@@ -338,7 +408,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             WHERE week BETWEEN {week - 3} AND {week - 1} AND report_status = 'Out'""")}
 
     u = usage(con, files, season, week)
-    stats = player_stats(u, positions)
+    stats = player_stats(u, positions, availability(con, roster_file, injuries_file) if roster_file else None)
     held, prev = replay(stats, week)
 
     # Last game's QB, for picking the starter.

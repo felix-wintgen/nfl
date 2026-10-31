@@ -222,6 +222,8 @@ Each player gets at most one label, picked by simple rules from season-to-date u
 
 Broadcast lines are templates with 2–3 variants per label (no LLM), e.g. _"Smith-Njigba is the engine: half of Seattle's air yards go his way."_ The same labels later feed the podcast personas.
 
+Shares count only the games a player was active for (weekly roster, or he touched the ball): a missed game is missing data, not zero targets. "On the rise" skips games he missed injured but counts healthy scratches as zero, so a player coming back from injury doesn't "rise". Replaying 2022–2026 both ways: only players who missed games change; labels fire 4–15 points more often (go-to guy for 74% of team-weeks instead of 59%), every label flips less, and the bars stay as they were. Raising them to the old frequencies would take labels from healthy players (Henry 2023, Hill 2024), so they weren't raised.
+
 Early season (weeks 1–3): too little data, so fall back to last season's usage, labelled "last season".
 
 ### 7.3 Data
@@ -243,7 +245,7 @@ The pipeline precomputes one `matchups_{season}.json` for the upcoming week (lab
 | S3  | Matchup page: picker, header, two halves, who's out                       | Renders for every week-8 game, phone and print                                                         |
 | S4  | Links and polish                                                          | Linked from the home page and the DC helper; Lighthouse unchanged                                      |
 
-**Status (2026-10-31):** S1–S3 built (`pipeline/matchup.py`, `src/lib/broadcast.ts`, `/matchup`); the board prints on one page. S4 partly: Game day is in the nav and on the home page; a "next game" link in the DC/OC headers is still open. Labels are sticky (enter/stay bars, replayed week by week), so the daily rebuild only changes them after a game; injury reports update daily. The starter is last game's QB, unless a QB with real starts is back from being ruled out (week 8: Lamar Jackson over Tyler Huntley).
+**Status (2026-10-31):** S1–S3 built (`pipeline/matchup.py`, `src/lib/broadcast.ts`, `/matchup`); the board prints on one page. S4 done: Game day is in the nav and on the home page, and the DC/OC headers link to the team's next game. Labels are sticky (enter/stay bars, replayed week by week), so the daily rebuild only changes them after a game; injury reports update daily. The starter is last game's QB, unless a QB with real starts is back from being ruled out (week 8: Lamar Jackson over Tyler Huntley).
 
 ### 7.5 Open questions
 

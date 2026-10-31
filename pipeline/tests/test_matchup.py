@@ -4,11 +4,13 @@ import pytest
 
 from matchup import (
     BACK_RULES,
+    Availability,
     QB_RULES,
     TARGET_RULES,
     apply_rules,
     implied_scores,
     on_the_rise,
+    player_stats,
     record,
     replay,
     win_prob,
@@ -72,6 +74,47 @@ def test_replay_never_holds_a_label_it_never_earned():
     stats = {(w, "SEA"): {"targets": {"p1": target(share=0.23)}, "backs": {}, "qbs": {}} for w in (4, 5)}
     held, _ = replay(stats, 5)
     assert held[("SEA", "targets", "p1")] == []
+
+
+def usage_for(per_week):
+    """Usage tables for one team; per_week maps week -> {player: targets}, 10 team targets a week.
+    Stats are as of the week after the last."""
+    w = max(per_week) + 1
+    weeks = sorted(per_week)
+    recent = weeks[-3:]
+    per_game, season = [], {}
+    for wk, players in per_week.items():
+        rows = {**players, "filler": 10 - sum(players.values())}
+        for pid, n in rows.items():
+            per_game.append(dict(team="LA", week=wk, id=pid, targets=n, ay=8 * n, rz_targets=0,
+                                 third_targets=0, carries=0, inside5=0))
+            t = season.setdefault(pid, dict(targets=0, t3=0))
+            t["targets"] += n
+            t["t3"] += n if wk in recent else 0
+    target = [dict(w=w, team="LA", id=pid, targets=t["targets"], ay=8 * t["targets"], rz_targets=0,
+                   third_targets=0, rec=0, rec_yards=0, rec_td=0, games=len(weeks), t3=t["t3"])
+              for pid, t in season.items() if t["targets"]]
+    return dict(target=target, rush=[], qb=[], games=[dict(w=w, team="LA", games=len(weeks))],
+                per_game=[r for r in per_game if r["targets"]]), w
+
+
+def test_shares_count_only_games_he_was_active_for():
+    # Out in weeks 2 and 3 (injured); 5 of the team's 10 targets in each game he played.
+    u, w = usage_for({1: {"p": 5}, 2: {}, 3: {}, 4: {"p": 5}})
+    avail = Availability(active={("p", "LA", wk) for wk in (1, 4)}, hurt={("p", 2), ("p", 3)})
+    assert player_stats(u, {}, avail)[(w, "LA")]["targets"]["p"]["share"] == pytest.approx(0.5)
+    assert player_stats(u, {})[(w, "LA")]["targets"]["p"]["share"] == pytest.approx(0.25)  # every game
+
+
+def test_no_rise_from_coming_back_from_injury():
+    # Same role all season, but out injured in weeks 2 and 3.
+    u, w = usage_for({1: {"p": 3}, 2: {}, 3: {}, 4: {"p": 3}, 5: {"p": 3}, 6: {"p": 3}})
+    active = {("p", "LA", wk) for wk in (1, 4, 5, 6)}
+    hurt = Availability(active, hurt={("p", 2), ("p", 3)})
+    assert not on_the_rise(player_stats(u, {}, hurt)[(w, "LA")]["targets"]["p"])
+    # A healthy scratch is different: he wasn't in the plan, now he is.
+    scratch = Availability(active, hurt=set())
+    assert on_the_rise(player_stats(u, {}, scratch)[(w, "LA")]["targets"]["p"])
 
 
 @pytest.mark.parametrize("spread, total, expected", [

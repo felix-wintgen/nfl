@@ -181,8 +181,9 @@
 
 		<p class="fine muted">
 			Roles come from this season's usage (targets, air yards, carries) before this week, which
-			carries over from game to game; a role sticks until a player falls clearly below it. Injury
-			report and rosters: nflverse.
+			carries over from game to game. Shares count only the games a player was active for, so an
+			injury doesn't shrink his role; a role sticks until he falls clearly below it. Injury report
+			and rosters: nflverse.
 		</p>
 	{/if}
 {/if}
