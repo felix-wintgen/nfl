@@ -15,7 +15,7 @@ npm run dev
 
 ## Data pipeline
 
-`pipeline/build.py` downloads play-by-play, NGS participation and FTN charting from the nflverse-data releases. It caches them in `pipeline/.cache`, joins them per play, and writes one slim `static/data/plays_{season}.parquet` per season, plus `fourth_{season}.parquet` with every 4th down including punts and field goals (for go-for-it rates). It also writes `teams.json`, `games.json` and `manifest.json`.
+`pipeline/build.py` downloads play-by-play, NGS participation and FTN charting from the nflverse-data releases. It caches them in `pipeline/.cache`, joins them per play, and writes one slim `static/data/plays_{season}.parquet` per season, plus `fourth_{season}.parquet` with every 4th down including punts and field goals (for go-for-it rates). It also writes `teams.json`, `games.json`, `matchups.json` and `manifest.json`.
 
 The derived columns (personnel grouping, defensive package, distance bucket, field zone …) are DuckDB macros in `pipeline/derive.py`, tested in `pipeline/tests/` (`npm run data:test`).
 
@@ -24,6 +24,10 @@ The build exits non-zero when a sanity check fails (low join rates, too few play
 Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-downloads cached files.
 
 `npm run data:backtest -- 2023 2024 2025` checks whether the DC helper's tells hold up: it picks them from weeks 1–9 and compares them with weeks 10–18. It also fits `SHRINK_PLAYS` in `src/lib/tells.ts`; rerun it once a season is complete.
+
+## Game day
+
+`/matchup` is a spotting board for the upcoming week: the line, both offenses' QB, top targets and backfield with role labels ("go-to guy", "workhorse" …) and who's out. `pipeline/matchup.py` writes `static/data/matchups.json` from this season's usage plus nflverse rosters and injury reports; the labels are sticky (earned at one bar, kept until clearly below a lower one). `src/lib/broadcast.ts` words them, with a few random variants per label.
 
 ## Known data gaps
 

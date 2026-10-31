@@ -23,6 +23,10 @@
 <p class="muted">Opponent scouting built on nflverse data.</p>
 
 <div class="tools">
+	<a class="card" href={resolve('/matchup')}>
+		<h2>Game day</h2>
+		<p>This week's games: the line, who gets the ball, who's out. <em>Ready for kickoff.</em></p>
+	</a>
 	<a class="card" href={resolve('/dc')}>
 		<h2>DC helper</h2>
 		<p>Scout the opposing offense: <em>what am I facing?</em></p>

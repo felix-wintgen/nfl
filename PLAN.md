@@ -92,7 +92,7 @@ Browser
 
 - Repo: `felix-wintgen/nfl` (public), deployed by GitHub Actions to Pages.
 - Seasons: 2022–current; the whole dataset is ~4 MB.
-- Matchup mode (my offense vs. their defense) is folded into the podcast mode below.
+- Matchup mode: a game-day screen of its own, offense only and built around players (section 7). The podcast mode builds on it.
 
 ## 6. Next: podcast mode
 
@@ -114,6 +114,8 @@ Every game is two matchups: home offense vs. away defense, and the reverse. For 
 | Pass rate over expected, early-down pass rate | Pass rate faced             |
 
 An **edge** is a large gap between the two percentiles (for example an offense in the top 5 in run EPA against a defense in the bottom 5). The biggest edges per game are what the personas talk about. The matchup page shows both pairings side by side, with the edges highlighted.
+
+**Backtest (2026-10-31, 1,908 team-games 2022–2026, week 4 on, earlier weeks only):** paired season-to-date numbers predict a game only after heavy shrinkage (about 400 league-average plays; defense needs about four times more than offense). Even then only broad efficiency holds (EPA/play, success rate, pass EPA, early-down pass rate). Fine-grained pairings are noise: deep passes vs. deep defense held their direction in 51% of the most lopsided matchups, run lanes 59%. Strength meeting weakness adds nothing beyond offense + defense − league, opponent adjustment gains 0.3 points, and a margin built from the pairings does not beat the spread (46.6% against the spread on its biggest disagreements). So edges are for the personas' talk, not for predictions, which suits the joke.
 
 Data: `schedules/games.parquet` already has next week's games plus `spread_line`, `total_line` and moneylines (checked: all 14 week-8 games have lines). Edges must use only plays from **before** that game's week, so backtests don't leak results.
 
@@ -168,3 +170,83 @@ Picks for the upcoming week are generated in the daily Action and **committed** 
 - The Homer's team.
 - Picks against the spread and over/under, or winners only? (Proposal: all three. The lines are already in the data.)
 - Claude for the wording: from the start, later, or never?
+
+## 7. Next: matchup screen ("spotting board")
+
+TV announcers prepare with spotting boards: every player's number, name and two or three talking points. This screen is the viewer's spotting board. Goal: **someone who tunes in with 3 seconds to spare knows who matters and what the broadcast will say about them.**
+
+Decided (2026-10-31): **offense only** (defense is for connoisseurs and stays in the OC helper), **plain, broadcast-style wording**, built around **people**, not team metrics.
+
+Why people and usage: a player's share of targets, air yards and carries carries over to the next game (r = 0.56–0.82, 2022–2026); his EPA per touch doesn't (r ≈ 0.08). Role stories rest on usage, so they hold. The screen tells you what you'll hear, not what will happen; it makes no predictions.
+
+### 7.1 Layout
+
+One game per screen, two halves, read top to bottom:
+
+```
+CHI @ SEA · Mon 8:15 pm ET · Seattle by 3.5 · line says 24–21
+records · division game · roof / weather · head coaches
+
+WHEN SEATTLE HAS THE BALL
+  QB     #14 Darnold         role label + one broadcast line
+  Targets  3–4 cards         #number, name, role label, one line
+  Backfield                  "workhorse" or "committee", with the split
+WHEN CHICAGO HAS THE BALL
+  (mirrored)
+WHO'S OUT                    QB/WR/TE/RB on the injury report, and who steps up
+```
+
+On a phone the halves stack; printed, it's one page. A game picker lists the week's games, defaulting to the next kickoff. URL: `/matchup?game=2026_08_CHI_SEA`. No headshots (NFL/ESPN images); jersey numbers in team colors carry the identity.
+
+### 7.2 Role labels
+
+Each player gets at most one label, picked by simple rules from season-to-date usage, plus one supporting fact. Starting points; thresholds get calibrated on 2022–2025 so each label fires for a sensible number of players league-wide:
+
+| Role      | Label                    | Rule (draft)                                             |
+| --------- | ------------------------ | -------------------------------------------------------- |
+| QB        | Gunslinger               | High aDOT / deep-throw rate                              |
+| QB        | Quick game               | Low aDOT, ball out early                                 |
+| QB        | Dual threat              | Scrambles + designed runs well above league              |
+| QB        | Under siege              | Sack rate well above league                              |
+| QB        | Turnover watch / careful | INT rate high / low (season so far)                      |
+| Target    | The go-to guy            | Target share ≥ ~25%                                      |
+| Target    | Deep threat              | High air-yard share and long aDOT                        |
+| Target    | Security blanket         | TE or RB, short aDOT, big 3rd-down share                 |
+| Target    | Red-zone target          | Large share of red-zone targets                          |
+| Target    | On the rise              | Share over the last 3 games well above his earlier share |
+| Target    | Rookie                   | `rookie_year` = season (combines with another label)     |
+| Backfield | Workhorse                | ≥ ~65% of RB carries                                     |
+| Backfield | Committee                | No back above ~50%                                       |
+| Backfield | Passing-down back        | RB with a big 3rd-down target share                      |
+| Backfield | Goal-line back           | Most carries inside the 5                                |
+
+Broadcast lines are templates with 2–3 variants per label (no LLM), e.g. _"Smith-Njigba is the engine: half of Seattle's air yards go his way."_ The same labels later feed the podcast personas.
+
+Early season (weeks 1–3): too little data, so fall back to last season's usage, labelled "last season".
+
+### 7.3 Data
+
+All from nflverse-data releases (checked 2026-10-31: 2026 files exist; rosters and injury reports are through week 8):
+
+- `weekly_rosters/roster_weekly_{season}.parquet`: jersey number, position, status, `rookie_year`; joins to play-by-play on `gsis_id` = `receiver_player_id` / `rusher_player_id` / passer id.
+- `injuries/injuries_{season}.parquet`: `report_status` (Out / Doubtful / Questionable) and practice status for the current week.
+- `schedules/games.parquet` (already cached): lines, kickoff time, rest, roof, temperature, wind, coaches, QBs.
+
+The pipeline precomputes one `matchups_{season}.json` for the upcoming week (labels, facts, injuries), so the screen loads instantly without DuckDB. Role rules live in Python with pytest, like the derivations. Injury reports are final on Friday; the 10:00 UTC daily build picks them up Saturday morning, after Thursday's game (an extra Friday-evening run is an option).
+
+### 7.4 Milestones
+
+| #   | Milestone                                                                 | Done when                                                                                              |
+| --- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| S1  | Pipeline: rosters, injuries, extended schedule → `matchups_{season}.json` | Week-8 file has every game, both offenses, jersey numbers match the roster                             |
+| S2  | Role engine + broadcast lines (Python, pytest)                            | Labels calibrated on 2022–2025; hand-checked for a few teams (e.g. Smith-Njigba = deep threat / go-to) |
+| S3  | Matchup page: picker, header, two halves, who's out                       | Renders for every week-8 game, phone and print                                                         |
+| S4  | Links and polish                                                          | Linked from the home page and the DC helper; Lighthouse unchanged                                      |
+
+**Status (2026-10-31):** S1–S3 built (`pipeline/matchup.py`, `src/lib/broadcast.ts`, `/matchup`); the board prints on one page. S4 partly: Game day is in the nav and on the home page; a "next game" link in the DC/OC headers is still open. Labels are sticky (enter/stay bars, replayed week by week), so the daily rebuild only changes them after a game; injury reports update daily. The starter is last game's QB, unless a QB with real starts is back from being ruled out (week 8: Lamar Jackson over Tyler Huntley).
+
+### 7.5 Open questions
+
+- How many targets per team: 3 or 4?
+- Wording of the lines: how broadcasty before it turns into the podcast mode?
+- Extra Friday-evening build for final injury statuses?

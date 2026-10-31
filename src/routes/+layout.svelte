@@ -22,6 +22,7 @@
 	});
 
 	const links = [
+		{ href: resolve('/matchup'), label: 'Game day' },
 		{ href: resolve('/dc'), label: 'DC helper' },
 		{ href: resolve('/oc'), label: 'OC helper' }
 	];
@@ -96,6 +97,15 @@
 	.brand {
 		font-weight: 700;
 		margin-right: auto;
+	}
+	nav a {
+		white-space: nowrap;
+	}
+	@media (max-width: 420px) {
+		nav {
+			gap: 0.8rem;
+			font-size: 0.88rem;
+		}
 	}
 	.asof {
 		max-width: 1100px;

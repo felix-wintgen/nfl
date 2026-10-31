@@ -7,6 +7,7 @@ them per play, derives scouting columns (see derive.py) and writes:
     static/data/fourth_{season}.parquet   (every 4th down incl. punts/FGs)
     static/data/teams.json
     static/data/games.json
+    static/data/matchups.json             (the upcoming week's spotting board)
     static/data/manifest.json
 
 Usage:
@@ -28,6 +29,7 @@ from typing import Dict, List, Optional
 import duckdb
 
 from derive import connect
+import matchup
 
 RELEASES = "https://github.com/nflverse/nflverse-data/releases/download"
 ROOT = Path(__file__).resolve().parent.parent
@@ -95,7 +97,7 @@ COPY (
         p.run_gap,
         p.receiver_player_id, p.receiver_player_name,
         p.rusher_player_id, p.rusher_player_name,
-        p.passer_player_name,
+        p.passer_player_id, p.passer_player_name,
 
         CAST(p.yards_gained AS SMALLINT) AS yards_gained,
         CAST(p.epa AS FLOAT) AS epa,
@@ -272,6 +274,25 @@ def build_meta(con: duckdb.DuckDBPyConnection, seasons: List[int], refresh: bool
     """, "games.json")
 
 
+def build_matchups(con: duckdb.DuckDBPyConnection, season: int, refresh: bool) -> None:
+    """Spotting-board data for the upcoming week (see matchup.py); skipped after the season."""
+    games = download("schedules", "games.parquet", refresh)
+    roster = download("weekly_rosters", f"roster_weekly_{season}.parquet", refresh)
+    injuries = download("injuries", f"injuries_{season}.parquet", refresh)
+    stale = OUT / "matchups.json"
+    if roster is None:  # positions and jersey numbers come from it; the boards would be empty
+        stale.unlink(missing_ok=True)
+        print(f"  matchups: skipped, no roster file for {season}")
+        return
+    res = matchup.build(con, OUT, season, games, roster, injuries)
+    if res is None:
+        stale.unlink(missing_ok=True)
+        print("  matchups: no upcoming games")
+    else:
+        print(f"  matchups: {season} week {res['week']}, {len(res['games'])} games"
+              f"{'' if injuries else ', no injury file'}")
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seasons", type=int, nargs="*", help="seasons to build (default: 2022..latest)")
@@ -284,6 +305,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"building seasons {seasons}")
     infos = [build_season(con, s, args.refresh) for s in seasons]
     build_meta(con, seasons, args.refresh)
+    build_matchups(con, max(seasons), args.refresh)
 
     manifest = {
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
