@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { replaceState } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { ABOUT, boardTags, LABELS } from '#lib/broadcast.ts';
 	import OffenseBoard from '#lib/components/matchup/OffenseBoard.svelte';
 	import { weekLabel } from '#lib/format.ts';
 	import {
@@ -38,6 +39,12 @@
 		meta?.teams.find((t) => t.abbr === abbr) ??
 		({ abbr, name: abbr, nick: abbr, color: '#888', color2: '#888', logo: '' } as Team);
 	const builtAt = $derived(meta ? new Date(meta.manifest.built_at) : null);
+	// The tags on this game's boards, for the legend.
+	const legend = $derived.by(() => {
+		if (!game) return [];
+		const used = new Set([...boardTags(game.boards.away), ...boardTags(game.boards.home)]);
+		return Object.keys(ABOUT).filter((k) => used.has(k));
+	});
 
 	function when(g: Game): string {
 		return kickoff(g).toLocaleString(undefined, {
@@ -179,6 +186,20 @@
 			<OffenseBoard board={game.boards.home} team={home} opponent={away} season={data.season} />
 		</div>
 
+		{#if legend.length}
+			<section class="legend">
+				<h3>What the tags mean <span class="screen-only">· tap a tag on the board</span></h3>
+				<dl>
+					{#each legend as k (k)}
+						<div>
+							<dt>{LABELS[k]}</dt>
+							<dd>{ABOUT[k]}</dd>
+						</div>
+					{/each}
+				</dl>
+			</section>
+		{/if}
+
 		<p class="fine muted">
 			Roles come from this season's usage (targets, air yards, carries) before this week, which
 			carries over from game to game. Shares count only the games a player was active for, so an
@@ -284,6 +305,40 @@
 		font-size: 0.78rem;
 		margin: 0.4rem 0 0;
 	}
+	.legend {
+		margin-top: 1rem;
+		font-size: 0.82rem;
+	}
+	.legend h3 {
+		font-size: 0.8rem;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--muted);
+		margin: 0 0 0.35rem;
+	}
+	.legend h3 span {
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 400;
+	}
+	.legend dl {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
+		gap: 0.25rem 1.5rem;
+		margin: 0;
+	}
+	.legend dt {
+		display: inline;
+		font-weight: 650;
+	}
+	.legend dt::after {
+		content: ': ';
+	}
+	.legend dd {
+		display: inline;
+		margin: 0;
+		color: var(--muted-strong);
+	}
 	.boards {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
@@ -300,6 +355,14 @@
 		}
 		.game {
 			margin-bottom: 0.4rem;
+		}
+		.legend {
+			margin-top: 0.4rem;
+			font-size: 0.68rem;
+		}
+		.legend dl {
+			grid-template-columns: 1fr 1fr 1fr;
+			gap: 0 0.75rem;
 		}
 	}
 </style>

@@ -22,8 +22,76 @@ export const LABELS: Record<string, string> = {
 	three_down: 'Three-down back',
 	lead: 'Lead back',
 	passing_down: 'Passing-down back',
-	goal_line: 'Goal-line back'
+	goal_line: 'Goal-line back',
+	rookie: 'Rookie',
+	returning: 'Back from injury',
+	changed: 'New starter',
+	questionable: 'Questionable',
+	doubtful: 'Doubtful',
+	out: 'Out',
+	injured_reserve: 'Injured reserve'
 };
+
+/** What each tag means, in plain words; the bars match pipeline/matchup.py. Order = legend order. */
+export const ABOUT: Record<string, string> = {
+	gunslinger: 'Throws deep: 8.8+ air yards per pass on average.',
+	quick_game: 'Gets the ball out short: 6.3 air yards per pass or less.',
+	dual_threat: 'Runs a lot: 12%+ of his plays are runs or scrambles, or 30+ rushing yards a game.',
+	under_siege: 'Sacked on 9%+ of his dropbacks.',
+	turnover_watch: 'Intercepted on 3%+ of his throws.',
+	careful: 'Intercepted on 1.2% of his throws or fewer.',
+	go_to: "25%+ of the team's targets in the games he played.",
+	deep_threat: "Targeted 13+ yards downfield on average, with 15%+ of the team's air yards.",
+	red_zone: "30%+ of the team's targets inside the 20.",
+	security_blanket:
+		'A tight end or back the QB leans on: 15%+ of the targets, mostly short, and 18%+ on third down.',
+	on_the_rise: 'His share of the targets over the last 3 games is well above his earlier share.',
+	workhorse: 'Gets 76%+ of the running back carries in the games he played.',
+	three_down: 'A workhorse who also gets the passing-down work.',
+	lead: 'Gets the most running back carries, but not enough to be a workhorse.',
+	passing_down: "Gets 60%+ of the backfield's third-down targets.",
+	goal_line: "Gets 60%+ of the backs' carries inside the 5.",
+	rookie: 'First NFL season.',
+	returning: 'Missed recent games injured and is expected to start again.',
+	changed: "Expected to start, but didn't start last game.",
+	questionable: "On this week's injury report as questionable: may or may not play.",
+	doubtful: "On this week's injury report as doubtful: unlikely to play.",
+	out: 'Ruled out for this game.',
+	injured_reserve: 'On injured reserve: out for at least several weeks.'
+};
+
+/** "Injured reserve" → "injured_reserve", the key for LABELS and ABOUT. */
+export const statusKey = (status: string) => status.toLowerCase().replaceAll(' ', '_');
+
+/** The injury tag next to a name: questionable or doubtful (players ruled out are under "Who's out"). */
+export const statusTag = (status: string | null) =>
+	status === 'Questionable' || status === 'Doubtful' ? statusKey(status) : null;
+
+/** Every tag a board shows, in legend order. */
+export function boardTags(b: Board): string[] {
+	const used = new Set<string>();
+	const person = (p: { rookie: boolean; status: string | null }) => {
+		if (p.rookie) used.add('rookie');
+		const s = statusTag(p.status);
+		if (s) used.add(s);
+	};
+	if (b.qb) {
+		person(b.qb);
+		if (b.qb.returning) used.add('returning');
+		else if (b.qb.changed) used.add('changed');
+		tags(b.qb.labels).forEach((l) => used.add(l));
+	}
+	for (const t of b.targets) {
+		person(t);
+		tags(t.labels).forEach((l) => used.add(l));
+	}
+	b.backs.forEach((bk, i) => {
+		person(bk);
+		tags(bk.labels, i === 0 && b.backfield === 'lead').forEach((l) => used.add(l));
+	});
+	for (const o of b.out) used.add(statusKey(o.status));
+	return Object.keys(ABOUT).filter((k) => used.has(k));
+}
 
 const p = (v: number) => `${Math.round(v * 100)}%`;
 const n1 = (v: number) => v.toFixed(1);

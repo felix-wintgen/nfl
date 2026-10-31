@@ -3,16 +3,18 @@
 	import {
 		backfieldLine,
 		backLine,
-		LABELS,
 		outLine,
 		qbLine,
 		qbSecondLine,
+		statusKey,
+		statusTag,
 		tags,
 		targetLine,
 		teamLine
 	} from '#lib/broadcast.ts';
 	import type { Board, Person } from '#lib/matchups.ts';
 	import type { Team } from '#lib/meta.ts';
+	import Tag from './Tag.svelte';
 
 	// One half of the spotting board: when this team has the ball.
 	let {
@@ -35,8 +37,7 @@
 		fresh.includes(tag) ||
 		(tag === 'three_down' && fresh.some((l) => l === 'workhorse' || l === 'passing_down'));
 
-	const status = (p: Person) =>
-		p.status === 'Questionable' ? 'Q' : p.status === 'Doubtful' ? 'Doubtful' : null;
+	const status = (p: Person) => statusTag(p.status);
 
 	const scout = (path: '/dc' | '/oc', abbr: string) =>
 		`${resolve(path)}?team=${abbr}&seasons=${season}`;
@@ -56,12 +57,12 @@
 			<div>
 				<div class="who">
 					<strong>{q.name}</strong> <span class="pos">QB</span>
-					{#if q.rookie}<span class="tag">Rookie</span>{/if}
-					{#if status(q)}<span class="tag warn">{status(q)}</span>{/if}
-					{#if q.returning}<span class="tag back">Back from injury</span>
-					{:else if q.changed}<span class="tag back">New starter</span>{/if}
+					{#if q.rookie}<Tag key="rookie" />{/if}
+					{#if status(q)}<Tag key={status(q)!} tone="warn" />{/if}
+					{#if q.returning}<Tag key="returning" tone="back" />
+					{:else if q.changed}<Tag key="changed" tone="back" />{/if}
 					{#each tags(q.labels) as l (l)}
-						<span class="tag" class:new={isNew(l, q.new)}>{LABELS[l]}</span>
+						<Tag key={l} fresh={isNew(l, q.new)} />
 					{/each}
 				</div>
 				{#each lines.qb as line, i (i)}<p class="line">{line}</p>{/each}
@@ -80,10 +81,10 @@
 			<div>
 				<div class="who">
 					<strong>{t.name}</strong> <span class="pos">{t.pos}</span>
-					{#if t.rookie}<span class="tag">Rookie</span>{/if}
-					{#if status(t)}<span class="tag warn">{status(t)}</span>{/if}
+					{#if t.rookie}<Tag key="rookie" />{/if}
+					{#if status(t)}<Tag key={status(t)!} tone="warn" />{/if}
 					{#each tags(t.labels) as l (l)}
-						<span class="tag" class:new={isNew(l, t.new)}>{LABELS[l]}</span>
+						<Tag key={l} fresh={isNew(l, t.new)} />
 					{/each}
 				</div>
 				{#if lines.targets[i]}<p class="line">{lines.targets[i]}</p>{/if}
@@ -102,10 +103,10 @@
 			<div>
 				<div class="who">
 					<strong>{b.name}</strong> <span class="pos">{b.pos}</span>
-					{#if b.rookie}<span class="tag">Rookie</span>{/if}
-					{#if status(b)}<span class="tag warn">{status(b)}</span>{/if}
+					{#if b.rookie}<Tag key="rookie" />{/if}
+					{#if status(b)}<Tag key={status(b)!} tone="warn" />{/if}
 					{#each tags(b.labels, i === 0 && board.backfield === 'lead') as l (l)}
-						<span class="tag" class:new={isNew(l, b.new)}>{LABELS[l]}</span>
+						<Tag key={l} fresh={isNew(l, b.new)} />
 					{/each}
 				</div>
 				{#if lines.backs[i]}<p class="line">{lines.backs[i]}</p>{/if}
@@ -123,7 +124,11 @@
 		<ul class="out">
 			{#each board.out as o (o.id)}
 				<li>
-					<span class="tag" class:warn={o.status !== 'Questionable'}>{o.status}</span>
+					<Tag
+						key={statusKey(o.status)}
+						text={o.status}
+						tone={o.status === 'Questionable' ? undefined : 'warn'}
+					/>
 					<strong>#{o.jersey ?? '–'} {o.name}</strong>
 					<span class="pos">{o.pos}</span>
 					<span class="muted">{outLine(o)}</span>
@@ -197,30 +202,6 @@
 	.pos {
 		font-size: 0.75rem;
 		color: var(--muted);
-	}
-	.tag {
-		font-size: 0.7rem;
-		padding: 0.05rem 0.4rem;
-		border-radius: 999px;
-		border: 1px solid var(--line);
-		color: var(--muted-strong);
-		white-space: nowrap;
-	}
-	.tag.new {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
-	.tag.new::before {
-		content: 'New: ';
-		font-weight: 600;
-	}
-	.tag.back {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
-	.tag.warn {
-		border-color: var(--bad);
-		color: var(--bad);
 	}
 	.line {
 		margin: 0.15rem 0 0;

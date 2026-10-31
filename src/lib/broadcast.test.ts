@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/paths', () => ({ asset: (p: string) => p }));
-const { backLine, mainLabel, outLine, targetLine, teamLine } = await import('./broadcast.ts');
+const { ABOUT, LABELS, backLine, boardTags, mainLabel, outLine, targetLine, teamLine } =
+	await import('./broadcast.ts');
 const { favorite, kickoff, nextGame } = await import('./matchups.ts');
 
 const person = {
@@ -94,6 +95,32 @@ describe('lines', () => {
 		expect(outLine(o)).toBe(
 			'their go-to guy, 27% of the targets · ankle. Next in line: Rome Odunze (18%).'
 		);
+	});
+});
+
+describe('tags', () => {
+	it('explains every tag it can show', () => {
+		for (const k of Object.keys(ABOUT)) expect(LABELS[k], k).toBeTruthy();
+	});
+
+	it("lists a board's tags in legend order, statuses included", () => {
+		const back = { ...person, pos: 'RB', labels: ['goal_line'], new: [], stats: {} };
+		const b = {
+			qb: { ...person, pos: 'QB', labels: ['gunslinger'], new: [], returning: true, changed: true },
+			targets: [{ ...person, status: 'Questionable', labels: ['go_to'], new: [] }],
+			backs: [back],
+			backfield: 'lead',
+			out: [{ ...person, status: 'Injured reserve', labels: [] }]
+		} as never;
+		expect(boardTags(b)).toEqual([
+			'gunslinger',
+			'go_to',
+			'lead',
+			'goal_line',
+			'returning',
+			'questionable',
+			'injured_reserve'
+		]);
 	});
 });
 
