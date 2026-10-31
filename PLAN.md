@@ -247,7 +247,7 @@ The pipeline precomputes one `matchups_{season}.json` for the upcoming week (lab
 | S3  | Matchup page: picker, header, two halves, who's out                       | Renders for every week-8 game, phone and print                                                         |
 | S4  | Links and polish                                                          | Linked from the home page and the DC helper; Lighthouse unchanged                                      |
 
-**Status (2026-10-31):** S1–S3 built (`pipeline/matchup.py`, `src/lib/broadcast.ts`, `/matchup`); the board prints on one page. S4 done: Game day is in the nav and on the home page, and the DC/OC headers link to the team's next game. Labels are sticky (enter/stay bars, replayed week by week), so the daily rebuild only changes them after a game; injury reports update daily. The starter is last game's QB, unless a QB with real starts is back from being ruled out (week 8: Lamar Jackson over Tyler Huntley).
+**Status (2026-10-31):** S1–S3 built (`pipeline/matchup.py`, `src/lib/broadcast.ts`, `/matchup`); the board prints on one page. S4 done: Game day is in the nav and on the home page, and the DC/OC headers link to the team's next game. Labels are sticky (enter/stay bars, replayed week by week), so the daily rebuild only changes them after a game; injury reports update daily. The starter is last game's QB, unless a QB with real starts is back from being ruled out (week 8: Lamar Jackson over Tyler Huntley). That exception waits for the team's final injury report: replayed 2022–2026, it was right 28% of the time midweek (not ruled out yet only means no status) and 48% after the report; gated, the QB pick is right in 90.5% of games midweek and 91.6% after.
 
 ### 7.5 Open questions
 

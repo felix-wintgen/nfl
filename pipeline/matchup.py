@@ -511,10 +511,13 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
 
         # QB: last game's passer, unless the season's main QB is back from an
         # injury or last game's passer is out; then the most-used available QB.
+        # "Back" waits for the final report: before it, not ruled out only means no status yet
+        # (2022-2026 midweek, the rule was right 28% of the time; after the report, 48%).
         qbs = s["qbs"]
         cands = [pid for pid in sorted(qbs, key=lambda p: -qbs[p]["dropbacks"]) if not unavailable(pid, team)]
         last = last_qb.get(team)
-        back = [pid for pid in cands if pid in recently_out and pid != last and qbs[pid]["dropbacks"] >= 60]
+        back = [pid for pid in cands if pid in recently_out and pid != last and qbs[pid]["dropbacks"] >= 60
+                and team not in pending]
         if back:
             starter = back[0]
         elif last in qbs and not unavailable(last, team):
