@@ -45,6 +45,16 @@ jobs:
         working-directory: pipeline
         run: python -m pytest -q
 
+      # Finished seasons never change: keep their nflverse files between runs, so each
+      # build only downloads the current season. Add the season that just ended once a year.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            pipeline/.cache/pbp/play_by_play_202[2-5].parquet
+            pipeline/.cache/pbp_participation/pbp_participation_202[2-5].parquet
+            pipeline/.cache/ftn_charting/ftn_charting_202[2-5].parquet
+          key: nflverse-2022-2025-v1
+
       - name: Build data
         run: python pipeline/build.py
 
