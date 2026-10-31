@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import favicon from '#lib/assets/favicon.svg';
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { weekLabel } from '#lib/format.ts';
@@ -30,6 +30,9 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	<!-- Home-screen icon (iOS ignores SVG icons); rendered from #lib/assets/app-icon.svg. -->
+	<link rel="apple-touch-icon" href={asset('apple-touch-icon.png')} />
+	<meta name="apple-mobile-web-app-title" content="NFL Scout" />
 	<meta
 		name="description"
 		content="Opponent scouting for NFL coordinators: offensive tendencies and tells, defensive packages, coverage and pressure, built on nflverse data."

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+	<!-- Home-screen icon source. Full bleed: iOS rounds the corners. static/apple-touch-icon.png is
+	     a 180x180 render of it, e.g. a headless Chrome screenshot of an <img> at that size (flags take two dashes; XML comments can't hold them):
+	     chrome -headless=new -force-device-scale-factor=1 -window-size=180,180 -screenshot=out.png page.html -->
+	<defs>
+		<radialGradient id="bg" cx="50%" cy="35%" r="75%">
+			<stop offset="0" stop-color="#3a2a1e"/>
+			<stop offset="1" stop-color="#1c1917"/>
+		</radialGradient>
+		<linearGradient id="leather" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="#b8612a"/>
+			<stop offset="0.55" stop-color="#8f4317"/>
+			<stop offset="1" stop-color="#5e2a0c"/>
+		</linearGradient>
+		<clipPath id="ball"><path d="M-66 0C-40-44 40-44 66 0C40 44-40 44-66 0Z"/></clipPath>
+	</defs>
+	<rect width="180" height="180" fill="url(#bg)"/>
+	<g transform="translate(90 91) rotate(-35) scale(1.14)">
+		<path d="M-66 0C-40-44 40-44 66 0C40 44-40 44-66 0Z" fill="url(#leather)" stroke="#3b1a06" stroke-width="2.5"/>
+		<g clip-path="url(#ball)" fill="#f5f0e6">
+			<rect x="-46" y="-40" width="6" height="80"/>
+			<rect x="40" y="-40" width="6" height="80"/>
+		</g>
+		<path d="M-60-2C-30-30 30-30 60-2" fill="none" stroke="#fff" stroke-opacity="0.18" stroke-width="3"/>
+		<g stroke="#f5f0e6" stroke-linecap="round">
+			<path d="M-20 0H20" stroke-width="5"/>
+			<path d="M-14-7V7M-5-7V7M4-7V7M13-7V7" stroke-width="4.5"/>
+		</g>
+	</g>
+</svg>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { replaceState } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { onMount, untrack, type Snippet } from 'svelte';
 	import { setMeta } from '#lib/context.ts';
 	import {
@@ -11,6 +12,7 @@
 		type Side
 	} from '#lib/filters.ts';
 	import { warmUp } from '#lib/db.ts';
+	import { finished, gameFor, kickoff, loadMatchups, type Matchups } from '#lib/matchups.ts';
 	import { loadMeta, type Meta } from '#lib/meta.ts';
 	import EngineNotice from './EngineNotice.svelte';
 	import FilterBar from './FilterBar.svelte';
@@ -26,9 +28,11 @@
 	let meta = $state<Meta | null>(null);
 	let filters = $state<Filters | null>(null);
 	let error = $state<string | null>(null);
+	let matchups = $state<Matchups | null>(null);
 	setMeta(() => meta!);
 
 	onMount(async () => {
+		loadMatchups().then((m) => (matchups = m));
 		try {
 			meta = await loadMeta();
 			const defaults = defaultFilters(meta.defaultSeasons);
@@ -55,6 +59,24 @@
 		meta && filters?.team ? meta.teams.find((t) => t.abbr === filters!.team) : undefined
 	);
 
+	// This team's game this week, until it's played: a way over to the Game day board.
+	const next = $derived.by(() => {
+		const g = team && gameFor(matchups, team.abbr);
+		if (!g || finished(g) || !meta) return null;
+		const nick = (abbr: string) => meta!.teams.find((t) => t.abbr === abbr)?.nick ?? abbr;
+		// Eastern time, as broadcasts list it; the Game day page adds the viewer's own.
+		const at = kickoff(g).toLocaleString('en-US', {
+			weekday: 'short',
+			hour: 'numeric',
+			minute: '2-digit',
+			timeZone: 'America/New_York'
+		});
+		return {
+			text: `${nick(g.away)} at ${nick(g.home)}, ${at} ET`,
+			href: `${resolve('/matchup')}?game=${g.game_id}`
+		};
+	});
+
 	function resetSituation() {
 		if (!filters || !meta) return;
 		const d = defaultFilters(meta.defaultSeasons);
@@ -80,6 +102,11 @@
 		<div>
 			<h1>{team.name} <span class="muted">{side}</span></h1>
 			<p class="muted screen-only">{title}: {question}</p>
+			{#if next}
+				<p class="next screen-only">
+					Next game: {next.text} · <a href={next.href}>Game day board</a>
+				</p>
+			{/if}
 			<p class="print-only">{title} game sheet · {describeFilters(filters)}</p>
 		</div>
 		<button type="button" class="print screen-only" onclick={() => window.print()}>
@@ -127,6 +154,9 @@
 	}
 	.head p {
 		margin: 0.2rem 0 0;
+	}
+	.next {
+		font-size: 0.85rem;
 	}
 	.print {
 		margin-left: auto;
