@@ -8,9 +8,10 @@ on:
   push:
     branches: [main]
   schedule:
-    # Off the hour: GitHub delays or drops scheduled runs most at :00 (Oct 31 started 15:35,
-    # Nov 1 at 16:34, Nov 2 not at all).
-    - cron: '17 10 * * *'
+    # After nflverse's night play-by-play run (00:30 Eastern) and the Tuesday gap in the odds
+    # (back by ~06:55 UTC in 2025); off the hour, where GitHub delays scheduled runs most
+    # (the 10:00 cron started 5.6 to 10 hours late, Oct 30 to Nov 2).
+    - cron: '50 8 * * *'
   workflow_dispatch:
 
 permissions:

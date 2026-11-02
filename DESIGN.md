@@ -15,13 +15,13 @@ All data comes from the `nflverse/nflverse-data` GitHub releases:
 
 - **We mirror the data.** GitHub release downloads have no CORS headers, so the browser can't read them; the pipeline writes slim per-season parquet files into the site.
 - **No current-season participation.** nflverse publishes it after the season. Personnel, formation and coverage come from last season and are labelled that way; the pipeline picks the file up if it appears.
-- **nflverse timing.** Play-by-play is refreshed daily in season (09:03 UTC) and after each game window, injuries at 07:07, rosters around 06:00. The daily build at 10:17 UTC (off the hour, where GitHub delays scheduled runs least) runs after all of them; GitHub can still start it hours late or skip a day, and pushes rebuild too. It's a volunteer project with no SLA; a failed sanity check stops the deploy and the last good site stays up.
+- **nflverse timing.** Play-by-play is refreshed after each game window, the last at 00:30 Eastern after the night game, and again daily at 05:00 Eastern in season; injuries at 07:07, rosters around 06:00. Lines for the next week go briefly blank after Monday night (Tuesday 03:30–06:45 UTC in 2025). The daily build at 08:50 UTC (off the hour, where GitHub delays scheduled runs least) runs after the night refresh and the odds gap, and in winter before the 05:00 Eastern re-pull (10:00 UTC); GitHub can still start it hours late or skip a day, and pushes rebuild too. It's a volunteer project with no SLA; a failed sanity check stops the deploy and the last good site stays up.
 - **nflverse gaps we've seen.** The schedule's starting-QB columns are the pre-game listing and often stay that way after the game (57 games 2022–2026 list a QB who didn't start). Weather and referee are filled in only after a game. Rows for a new playoff round arrive over about 12 hours after the matchups are set. Each build logs a data-health record (also in `manifest.json`): what triggered it, missing files, played games whose plays aren't in yet, teams without an injury report, and how often the board leaned on nflverse's listed QB. It changes nothing on the board; it's the record for deciding which gap needs handling.
 
 ## Architecture
 
 ```
-GitHub Action (every push, daily 10:17 UTC)
+GitHub Action (every push, daily 08:50 UTC)
   └─ pipeline/build.py (Python + DuckDB)
        download, join pbp ⟷ participation ⟷ FTN per play, derive columns
        write static/data/plays_{season}.parquet, teams.json, games.json, matchups.json, manifest.json
