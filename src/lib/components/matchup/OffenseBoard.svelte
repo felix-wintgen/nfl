@@ -122,11 +122,7 @@
 		<ul class="out">
 			{#each board.out as o (o.id)}
 				<li>
-					<Tag
-						key={statusKey(o.status)}
-						text={o.status}
-						tone={o.status === 'Questionable' ? undefined : 'warn'}
-					/>
+					<Tag key={statusKey(o.status)} text={o.status} tone="warn" />
 					<strong>#{o.jersey ?? '–'} {o.name}</strong>
 					<span class="pos">{o.pos}</span>
 					<span class="muted">{outLine(o)}</span>

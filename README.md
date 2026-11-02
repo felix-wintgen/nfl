@@ -1,6 +1,6 @@
 # NFL Scout
 
-Opponent-scouting tools built on [nflverse](https://github.com/nflverse) data: a **DC helper** (scout the opposing offense) and an **OC helper** (scout the opposing defense). It's a static SvelteKit site, with DuckDB-WASM querying parquet files in the browser. See [PLAN.md](PLAN.md).
+Opponent-scouting tools built on [nflverse](https://github.com/nflverse) data: a **DC helper** (scout the opposing offense) and an **OC helper** (scout the opposing defense). It's a static SvelteKit site, with DuckDB-WASM querying parquet files in the browser. Why it works the way it does: [DESIGN.md](DESIGN.md).
 
 ## Setup
 
@@ -49,5 +49,7 @@ BASE_PATH=/nfl npm run build
 GitHub disables scheduled workflows after 60 days without repository activity; re-enable it on the Actions tab if the data stops updating.
 
 ## License / attribution
+
+The code is MIT-licensed ([LICENSE](LICENSE)); the license doesn't cover the data.
 
 Most nflverse data (play-by-play, NGS participation) is CC-BY 4.0. FTN charting data is CC-BY-SA 4.0 and must be credited to "ftndata.com via nflverse"; the site footer does both. The NFL data belongs to its respective owners.

@@ -52,10 +52,12 @@
 	button.tag:hover {
 		border-color: var(--muted);
 	}
+	/* Red outline means health; news (new label, QB back or changed) is filled instead. */
 	.tag.new,
 	.tag.back {
-		border-color: var(--accent);
-		color: var(--accent);
+		border-color: var(--accent-soft);
+		background: var(--accent-soft);
+		color: var(--fg);
 	}
 	.tag.warn {
 		border-color: var(--bad);

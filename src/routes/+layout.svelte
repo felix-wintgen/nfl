@@ -67,14 +67,16 @@
 <footer>
 	Play-by-play and NGS participation data:
 	<a href="https://github.com/nflverse">nflverse</a> (CC-BY 4.0). Charting data:
-	<a href="https://ftndata.com">ftndata.com</a> via nflverse (CC-BY-SA 4.0). NFL data belongs to its respective
-	owners.
+	<a href="https://ftndata.com">ftndata.com</a> via nflverse (CC-BY-SA 4.0). NFL data belongs to its
+	respective owners. <a href="https://github.com/felix-wintgen/nfl">Source code</a> (MIT).
 </footer>
 
 <style>
 	header {
 		border-bottom: 1px solid var(--line);
 		background: var(--card);
+		/* Clear of the blurred edge iOS Safari draws under the status bar. */
+		padding-top: 0.5rem;
 	}
 	nav,
 	main,
