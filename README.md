@@ -50,6 +50,8 @@ GitHub disables scheduled workflows after 60 days without repository activity; r
 
 ## License / attribution
 
+NFL Scout stands on nflverse: the data and the models behind its efficiency numbers (EPA, success rate, win probability, expected pass rate) come from [nflverse](https://github.com/nflverse) and [nflfastR](https://nflfastr.com). This app adds situational splits, league comparisons and the game-day labels.
+
 The code is MIT-licensed ([LICENSE](LICENSE)); the license doesn't cover the data.
 
 Most nflverse data (play-by-play, NGS participation) is CC-BY 4.0. FTN charting data is CC-BY-SA 4.0 and must be credited to "ftndata.com via nflverse"; the site footer does both. The NFL data belongs to its respective owners.
