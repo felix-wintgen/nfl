@@ -59,6 +59,14 @@
 		background: var(--accent-soft);
 		color: var(--fg);
 	}
+	/* The dark accent-soft is a red-brown that reads like the health tags; mix a golden one. */
+	@media screen and (prefers-color-scheme: dark) {
+		.tag.new,
+		.tag.back {
+			border-color: color-mix(in srgb, var(--accent) 30%, var(--card));
+			background: color-mix(in srgb, var(--accent) 30%, var(--card));
+		}
+	}
 	.tag.warn {
 		border-color: var(--bad);
 		color: var(--bad);
