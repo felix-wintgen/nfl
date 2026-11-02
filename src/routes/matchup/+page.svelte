@@ -78,7 +78,9 @@
 </script>
 
 <svelte:head>
-	<title>{game ? `${game.away} @ ${game.home} · ` : ''}Game day · NFL Scout</title>
+	<title
+		>{game ? `${game.away} ${game.neutral ? 'vs' : '@'} ${game.home} · ` : ''}Game day · NFL Scout</title
+	>
 </svelte:head>
 
 {#if data === undefined}
@@ -104,7 +106,7 @@
 				aria-pressed={g.game_id === gameId}
 				onclick={() => (gameId = g.game_id)}
 			>
-				<span>{g.away} @ {g.home}</span>
+				<span>{g.away} {g.neutral ? 'vs' : '@'} {g.home}</span>
 				<small>
 					{#if finished(g)}Final {g.away_score}–{g.home_score}{:else}{when(g)}{/if}
 				</small>
@@ -115,11 +117,12 @@
 	{#if game}
 		{@const away = teamOf(game.away)}
 		{@const home = teamOf(game.home)}
+		{@const played = Math.min(game.boards.away.games, game.boards.home.games)}
 		<header class="game card">
 			<div class="teams">
 				<img src={away.logo} alt="" width="44" height="44" />
 				<div>
-					<h2>{away.name} <span class="muted">at</span> {home.name}</h2>
+					<h2>{away.name} <span class="muted">{game.neutral ? 'vs.' : 'at'}</span> {home.name}</h2>
 					<p class="muted">
 						{kickoffText(game)}
 						{#if game.stadium}· {game.stadium}{/if}
@@ -179,6 +182,15 @@
 				})}; they move during the week. Head coaches: {game.away_coach ?? '–'} ({away.abbr}),
 				{game.home_coach ?? '–'} ({home.abbr}).
 			</p>
+			<!-- Labels need a few games of usage; say so rather than guess from last season. -->
+			{#if played < 3}
+				<p class="fine muted">
+					{played === 0
+						? 'No games played yet this season'
+						: `Only ${played} ${played === 1 ? 'game' : 'games'} played so far`}: roles and tags
+					show up after a few games.
+				</p>
+			{/if}
 		</header>
 
 		<div class="boards">

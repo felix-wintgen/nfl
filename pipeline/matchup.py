@@ -301,7 +301,7 @@ def player_stats(u: Dict[str, List[Dict]], positions: Dict[str, str],
                 "third_share": share(r["third_targets"], team, on, "third"),
                 "third_targets": r["third_targets"],
                 "rec": r["rec"], "rec_yards": r["rec_yards"], "rec_td": r["rec_td"],
-                "games": games.get((w, team), 0),
+                "games": games.get((w, team), 0), "active_games": len(on),
                 "last3_share": last3_share,
                 # No earlier games to compare with (all missed injured): no rise either.
                 "early_share": share(r["targets"] - r["t3"], team, early, "targets") if early else last3_share,
@@ -381,6 +381,9 @@ def practice(status: Optional[str]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 OUT_STATUSES = ("Out", "Doubtful")
+SAMPLE_GAMES, SAMPLE_TARGETS = 2, 8  # before ranking a receiver by share
+# Week 18 rest shows up on the report as "Not injury related - resting player".
+NOT_RESTING = "coalesce(report_primary_injury, '') NOT ILIKE '%resting%'"
 POSITIONS = ("QB", "RB", "FB", "WR", "TE")
 # Who's out lists a player who mattered: a real share of the targets or carries,
 # or (for blocking tight ends, fullbacks and depth receivers, whose job barely
@@ -438,7 +441,8 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             if r["report_status"] is not None:
                 injuries[r["gsis_id"]] = r
         missed = {(r["gsis_id"], r["week"]) for r in _rows(con, f"""
-            SELECT gsis_id, week FROM read_parquet('{injuries_file}') WHERE report_status IN {OUT_STATUSES}""")}
+            SELECT gsis_id, week FROM read_parquet('{injuries_file}')
+            WHERE report_status IN {OUT_STATUSES} AND {NOT_RESTING}""")}
     if roster_file:
         missed |= {(r["gsis_id"], r["week"]) for r in _rows(con, f"""
             SELECT gsis_id, week FROM read_parquet('{roster_file}') WHERE status = 'INA'""")}
@@ -465,16 +469,48 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
     stats = player_stats(u, positions, availability(con, roster_file, injuries_file) if roster_file else None)
     held, prev = replay(stats, week)
 
-    # Last game's QB, for picking the starter.
-    last_qb = {r["team"]: r["id"] for r in _rows(con, f"""
-        WITH p AS (SELECT * FROM read_parquet({files}) WHERE season = {season} AND week < {week} AND is_pass),
-        last AS (SELECT posteam, max(week) AS week FROM p GROUP BY posteam)
-        SELECT p.posteam AS team, coalesce(passer_player_id, rusher_player_id) AS id
-        FROM p JOIN last USING (posteam, week)
-        GROUP BY 1, 2 QUALIFY row_number() OVER (PARTITION BY team ORDER BY count(*) DESC) = 1""")}
+    # Each game's QBs: the one with the most dropbacks, and the one who started it.
+    most: Dict[Tuple[str, int], Tuple[int, str]] = {}   # (team, week) -> (dropbacks, id)
+    first: Dict[Tuple[str, int], Tuple[int, str]] = {}  # (team, week) -> (first play, id)
+    played_qb: Dict[Tuple[str, str], List[int]] = defaultdict(list)  # (team, id): weeks he dropped back
+    for r in _rows(con, f"""
+        SELECT posteam AS team, week, coalesce(passer_player_id, rusher_player_id) AS id,
+               count(*) AS n, min(play_id) AS first
+        FROM read_parquet({files}) WHERE season = {season} AND week < {week} AND is_pass
+          AND coalesce(passer_player_id, rusher_player_id) IS NOT NULL
+        GROUP BY ALL"""):
+        key = (r["team"], r["week"])
+        most[key] = max(most.get(key, (-1, "")), (r["n"], r["id"]))
+        first[key] = min(first.get(key, (r["first"] + 1, "")), (r["first"], r["id"]))
+        played_qb[(r["team"], r["id"])].append(r["week"])
+    game_qb = {k: pid for k, (_, pid) in most.items()}
+    started = {k: pid for k, (_, pid) in first.items()}
+    ruled_out: Set[Tuple[str, int]] = set()  # (id, week) listed out; a rested starter is often "doubtful"
+    if injuries_file:
+        ruled_out = {(r["gsis_id"], r["week"]) for r in _rows(con, f"""
+            SELECT gsis_id, week FROM read_parquet('{injuries_file}') WHERE report_status = 'Out' AND {NOT_RESTING}""")}
 
+    # Week 18 rest: a playoff team that sat its starter (the season's dropback leader
+    # didn't play, or only a series, and wasn't listed out) is judged by the game before,
+    # for the QB and for "missed last game".
+    if games[0]["game_type"] != "REG":
+        last_reg = max(g["week"] for g in sched if g["game_type"] == "REG")
+        for t, wk in list(last_week.items()):
+            qbs = stats.get((week, t), {}).get("qbs", {})
+            lead = max(qbs, key=lambda p: qbs[p]["dropbacks"], default=None)
+            if wk == last_reg and lead and game_qb.get((t, wk)) != lead and (lead, wk) not in ruled_out:
+                last_week[t] = max((g["week"] for g in sched if g["week"] < wk and t in (g["home_team"], g["away_team"])),
+                                   default=None)
+    last_qb = {t: game_qb.get((t, wk)) for t, wk in last_week.items()}
+
+    def was_starter(pid: str, team: str) -> bool:
+        """He started the last game he played in, so the job was his before he got hurt."""
+        weeks = played_qb.get((team, pid))
+        return bool(weeks) and started.get((team, max(weeks))) == pid
+
+    # Records, points and ranks are the regular season's: playoff teams would pile up extra games.
     team_ctx = {r["team"]: r for r in _rows(con, f"""
-        WITH p AS (SELECT * FROM read_parquet({files}) WHERE season = {season} AND week < {week}),
+        WITH p AS (SELECT * FROM read_parquet({files}) WHERE season = {season} AND week < {week} AND season_type = 'REG'),
         t AS (SELECT posteam AS team, avg(epa) AS epa,
                      avg(is_pass::INT) FILTER (WHERE down <= 2 AND wp BETWEEN 0.2 AND 0.8) AS early_pass
               FROM p GROUP BY posteam)
@@ -483,7 +519,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
                   count(*) OVER () AS teams
         FROM t""")}
 
-    played = [g for g in sched if g["week"] < week and g["home_score"] is not None]
+    played = [g for g in sched if g["week"] < week and g["home_score"] is not None and g["game_type"] == "REG"]
 
     def team_record(team: str) -> Tuple[str, float]:
         res = [(g["home_score"], g["away_score"]) if g["home_team"] == team else (g["away_score"], g["home_score"])
@@ -527,6 +563,12 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         before = prev.get((team, group, pid), [])
         return now, [l for l in now if l not in before]
 
+    def by_share(st: Dict) -> Tuple[float, float]:
+        """Sort key for targets: share over the games he was active for, once there's a sample;
+        raw count otherwise. A receiver back from injury or newly traded isn't buried under season totals."""
+        sampled = st["active_games"] >= SAMPLE_GAMES and st["targets"] >= SAMPLE_TARGETS
+        return -(st["share"] if sampled else 0.0), -st["targets"]
+
     def board(team: str) -> Dict:
         s = stats.get((week, team), {"targets": {}, "backs": {}, "qbs": {}})
         rec, pts = team_record(team)
@@ -540,7 +582,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         cands = [pid for pid in sorted(qbs, key=lambda p: -qbs[p]["dropbacks"]) if not unavailable(pid, team)]
         last = last_qb.get(team)
         back = [pid for pid in cands if pid in recently_out and pid != last and qbs[pid]["dropbacks"] >= 60
-                and team not in pending]
+                and team not in pending and was_starter(pid, team)]
         if back:
             starter = back[0]
         elif last in qbs and not unavailable(last, team):
@@ -554,7 +596,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
                   "changed": starter != last, "returning": starter != last and starter in recently_out}
 
         targets = []
-        for pid in sorted(s["targets"], key=lambda p: -s["targets"][p]["targets"]):
+        for pid in sorted(s["targets"], key=lambda p: by_share(s["targets"][p])):
             st = s["targets"][pid]
             if unavailable(pid, team) or positions.get(pid) not in ("WR", "TE", "RB", "FB"):
                 continue
@@ -623,7 +665,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         result["games"].append({
             "game_id": g["game_id"], "game_type": g["game_type"], "gameday": str(g["gameday"]),
             "weekday": g["weekday"], "gametime": g["gametime"],
-            "away": g["away_team"], "home": g["home_team"],
+            "away": g["away_team"], "home": g["home_team"], "neutral": g["location"] == "Neutral",
             "away_score": g["away_score"], "home_score": g["home_score"],
             "spread": g["spread_line"], "total": g["total_line"],
             "implied": {"home": imp[0], "away": imp[1]} if imp else None,

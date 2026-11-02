@@ -113,6 +113,8 @@ export interface Game {
 	gametime: string | null;
 	away: string;
 	home: string;
+	/** Neutral site (Super Bowl, international games): "vs.", not "at". */
+	neutral?: boolean;
 	away_score: number | null;
 	home_score: number | null;
 	/** Points the home team is favored by (negative: the away team is). */
