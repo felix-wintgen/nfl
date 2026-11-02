@@ -76,11 +76,24 @@ describe('lines', () => {
 			ppg_rank: 13,
 			early_pass: 0.49,
 			early_pass_rank: 26,
-			teams: 32
+			teams: 32,
+			games: 7
 		} as never;
 		expect(teamLine(b, 'Seahawks')).toBe(
 			'The Seahawks (4-3) score 24.0 points a game, 13th in the league. They lean on the run on early downs: 49% passes, 26th of 32.'
 		);
+	});
+
+	it('claims no points before the first game', () => {
+		const b = {
+			record: '0-0',
+			ppg: 0,
+			ppg_rank: null,
+			early_pass: null,
+			early_pass_rank: null,
+			games: 0
+		};
+		expect(teamLine(b as never, 'Patriots')).toBe("The Patriots haven't played yet this season.");
 	});
 
 	it("names who's next for an absent go-to guy", () => {

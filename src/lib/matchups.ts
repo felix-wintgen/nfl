@@ -94,8 +94,17 @@ export interface Board {
 	early_pass_rank: number | null;
 	teams: number | null;
 	games: number;
-	/** changed: someone else played QB last game; returning: he's back from an injury. */
-	qb: (Player<QbStats> & { changed: boolean; returning: boolean }) | null;
+	/** changed: someone else played QB last game; returning: he's back from an injury.
+	 * listed: named only by nflverse's listed starter (no dropbacks yet, zero stats);
+	 * alt: nflverse lists a different starter. */
+	qb:
+		| (Player<QbStats> & {
+				changed: boolean;
+				returning: boolean;
+				listed?: boolean;
+				alt?: { id: string; name: string; jersey: number | null } | null;
+		  })
+		| null;
 	targets: Player<TargetStats>[];
 	backs: Player<BackStats>[];
 	backfield: 'workhorse' | 'lead' | 'committee';

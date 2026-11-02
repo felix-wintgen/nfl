@@ -64,15 +64,23 @@
 					{/each}
 				</div>
 				{#each lines.qb as line, i (i)}<p class="line">{line}</p>{/each}
-				<p class="facts">
-					{q.stats.completions}/{q.stats.attempts} · {q.stats.pass_yards} yds · {q.stats.pass_td} TD ·
-					{q.stats.ints} INT · {q.stats.sacks} sacks
-				</p>
+				{#if q.alt}
+					<p class="line">Or #{q.alt.jersey ?? '–'} {q.alt.name}: nflverse lists him to start.</p>
+				{/if}
+				{#if q.listed}
+					<p class="facts">Listed starter (nflverse); no dropbacks this season yet.</p>
+				{:else}
+					<p class="facts">
+						{q.stats.completions}/{q.stats.attempts} · {q.stats.pass_yards} yds · {q.stats.pass_td} TD
+						·
+						{q.stats.ints} INT · {q.stats.sacks} sacks
+					</p>
+				{/if}
 			</div>
 		</div>
 	{/if}
 
-	<h3>Targets</h3>
+	{#if board.targets.length}<h3>Targets</h3>{/if}
 	{#each board.targets as t, i (t.id)}
 		<div class="row">
 			<div class="num">#{t.jersey ?? '–'}</div>
@@ -93,8 +101,10 @@
 		</div>
 	{/each}
 
-	<h3>Backfield</h3>
-	{#if lines.backfield}<p class="line">{lines.backfield}</p>{/if}
+	{#if board.backs.length}
+		<h3>Backfield</h3>
+		{#if lines.backfield}<p class="line">{lines.backfield}</p>{/if}
+	{/if}
 	{#each board.backs as b, i (b.id)}
 		<div class="row">
 			<div class="num">#{b.jersey ?? '–'}</div>

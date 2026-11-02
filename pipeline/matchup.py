@@ -381,6 +381,10 @@ def practice(status: Optional[str]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 OUT_STATUSES = ("Out", "Doubtful")
+# A QB named only by nflverse's listed starter: no dropbacks this season yet.
+NO_QB_STATS = {k: 0 for k in ("dropbacks", "attempts", "completions", "pass_yards", "pass_td", "ints", "sacks",
+                              "adot", "deep_rate", "sack_rate", "int_rate", "run_rate", "rush_yards", "rush_ypg",
+                              "rush_td", "games")}
 SAMPLE_GAMES, SAMPLE_TARGETS = 2, 8  # before ranking a receiver by share
 # Week 18 rest shows up on the report as "Not injury related - resting player".
 NOT_RESTING = "coalesce(report_primary_injury, '') NOT ILIKE '%resting%'"
@@ -569,7 +573,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         sampled = st["active_games"] >= SAMPLE_GAMES and st["targets"] >= SAMPLE_TARGETS
         return -(st["share"] if sampled else 0.0), -st["targets"]
 
-    def board(team: str) -> Dict:
+    def board(team: str, listed: Optional[str]) -> Dict:
         s = stats.get((week, team), {"targets": {}, "backs": {}, "qbs": {}})
         rec, pts = team_record(team)
         ctx = team_ctx.get(team, {})
@@ -589,11 +593,23 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             starter = last
         else:
             starter = cands[0] if cands else None
+        # nflverse's listed starter is a second opinion: it fills a blank (Week 1, a QB without
+        # dropbacks yet) and is shown next to ours when they differ. Replayed 2022-2026, the two
+        # agree on 91% of boards and are then right 99% of the time; when they differ, each is
+        # right about half the time, so the board names both instead of picking one.
+        if listed and unavailable(listed, team):
+            listed = None
+        if not starter and listed:
+            starter = listed
         qb = None
         if starter:
             now, new = labels(team, "qbs", starter)
-            qb = {**person(starter), "stats": qbs[starter], "labels": now, "new": new,
-                  "changed": starter != last, "returning": starter != last and starter in recently_out}
+            alt = person(listed) if listed and listed != starter else None
+            qb = {**person(starter), "stats": qbs.get(starter, NO_QB_STATS), "labels": now, "new": new,
+                  "changed": last is not None and starter != last,
+                  "returning": last is not None and starter != last and starter in recently_out,
+                  "listed": starter not in qbs,
+                  "alt": {k: alt[k] for k in ("id", "name", "jersey")} if alt else None}
 
         targets = []
         for pid in sorted(s["targets"], key=lambda p: by_share(s["targets"][p])):
@@ -673,7 +689,8 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             "div_game": bool(g["div_game"]), "roof": g["roof"], "temp": g["temp"], "wind": g["wind"],
             "stadium": g["stadium"], "away_coach": g["away_coach"], "home_coach": g["home_coach"],
             "away_rest": g["away_rest"], "home_rest": g["home_rest"],
-            "boards": {"away": board(g["away_team"]), "home": board(g["home_team"])},
+            "boards": {"away": board(g["away_team"], g.get("away_qb_id")),
+                       "home": board(g["home_team"], g.get("home_qb_id"))},
         })
     (out_dir / "matchups.json").write_text(json.dumps(result, separators=(",", ":"), default=_num))
     return result

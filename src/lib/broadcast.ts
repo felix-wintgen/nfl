@@ -279,6 +279,7 @@ export function backfieldLine(board: Board, rng: Rng = Math.random): string | nu
 
 /** "Seattle (4-3) scores 24.0 a game, 13th. On early downs they lean on the run." */
 export function teamLine(b: Board, name: string): string {
+	if (!b.games) return `The ${name} haven't played yet this season.`;
 	const parts = [`The ${name} (${b.record}) score ${n1(b.ppg)} points a game`];
 	if (b.ppg_rank) parts[0] += `, ${ordinal(b.ppg_rank)} in the league`;
 	const r = b.early_pass_rank;

@@ -36,7 +36,7 @@ Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-dow
 
 ## Deployment
 
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) rebuilds the data and deploys the site to GitHub Pages on every push to `main`, daily at 10:00 UTC, and on demand (Actions → Build and deploy → Run workflow). If the pipeline's sanity checks fail, nothing is deployed and the previous site stays up.
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) rebuilds the data and deploys the site to GitHub Pages on every push to `main`, daily at 10:17 UTC, and on demand (Actions → Build and deploy → Run workflow). If the pipeline's sanity checks fail, nothing is deployed and the previous site stays up.
 
 One-time setup: in the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
 

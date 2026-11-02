@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -274,24 +275,63 @@ def build_meta(con: duckdb.DuckDBPyConnection, seasons: List[int], refresh: bool
     """, "games.json")
 
 
-def build_matchups(con: duckdb.DuckDBPyConnection, season: int, refresh: bool) -> None:
-    """Spotting-board data for the upcoming week (see matchup.py); skipped after the season."""
+def build_matchups(con: duckdb.DuckDBPyConnection, season: int, refresh: bool) -> Dict:
+    """Spotting-board data for the upcoming week (see matchup.py); skipped after the season.
+    Returns the data-health record for the manifest."""
     games = download("schedules", "games.parquet", refresh)
     roster = download("weekly_rosters", f"roster_weekly_{season}.parquet", refresh)
     injuries = download("injuries", f"injuries_{season}.parquet", refresh)
     snaps = download("snap_counts", f"snap_counts_{season}.parquet", refresh)
     stale = OUT / "matchups.json"
+    files = {"roster": roster, "injuries": injuries, "snap_counts": snaps}
+    res = None
     if roster is None:  # positions and jersey numbers come from it; the boards would be empty
         stale.unlink(missing_ok=True)
         print(f"  matchups: skipped, no roster file for {season}")
-        return
-    res = matchup.build(con, OUT, season, games, roster, injuries, snaps_file=snaps)
-    if res is None:
-        stale.unlink(missing_ok=True)
-        print("  matchups: no upcoming games")
     else:
-        print(f"  matchups: {season} week {res['week']}, {len(res['games'])} games"
-              f"{'' if injuries else ', no injury file'}")
+        res = matchup.build(con, OUT, season, games, roster, injuries, snaps_file=snaps)
+        if res is None:
+            stale.unlink(missing_ok=True)
+            print("  matchups: no upcoming games")
+        else:
+            print(f"  matchups: {season} week {res['week']}, {len(res['games'])} games"
+                  f"{'' if injuries else ', no injury file'}")
+    health = data_health(con, season, games, injuries, files, res)
+    print(f"  health: {json.dumps(health)}")
+    return health
+
+
+def data_health(con: duckdb.DuckDBPyConnection, season: int, games: Path, injuries: Optional[Path],
+                files: Dict[str, Optional[Path]], res: Optional[Dict]) -> Dict:
+    """Where nflverse was late or incomplete for this build. Logged only: nothing here
+    changes the boards, it's the record for deciding whether a gap needs handling."""
+    plays = OUT / f"plays_{season}.parquet"
+    lagging = [r[0] for r in con.execute(f"""
+        SELECT game_id FROM read_parquet('{games}')
+        WHERE season = {season} AND home_score IS NOT NULL
+          AND game_id NOT IN (SELECT DISTINCT game_id FROM read_parquet('{plays}'))
+        ORDER BY game_id""").fetchall()] if plays.exists() else []
+    health = {
+        "trigger": os.environ.get("GITHUB_EVENT_NAME", "local"),
+        "missing": [name for name, path in files.items() if path is None],
+        # Games the schedule has as played whose plays aren't in the play-by-play yet.
+        "plays_lagging": lagging,
+    }
+    if res:
+        teams = sorted({g[s] for g in res["games"] for s in ("away", "home")})
+        listed = set()
+        if injuries:
+            listed = {r[0] for r in con.execute(f"""
+                SELECT DISTINCT team FROM read_parquet('{injuries}') WHERE week = {res['week']}""").fetchall()}
+        boards = [b for g in res["games"] for b in g["boards"].values()]
+        health.update({
+            "week": res["week"],
+            "no_injury_report": [t for t in teams if t not in listed],
+            "qb_listed_only": sum(bool(b["qb"] and b["qb"].get("listed")) for b in boards),
+            "qb_two_names": sum(bool(b["qb"] and b["qb"].get("alt")) for b in boards),
+            "qb_none": sum(b["qb"] is None for b in boards),
+        })
+    return health
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -306,11 +346,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"building seasons {seasons}")
     infos = [build_season(con, s, args.refresh) for s in seasons]
     build_meta(con, seasons, args.refresh)
-    build_matchups(con, max(seasons), args.refresh)
+    health = build_matchups(con, max(seasons), args.refresh)
 
     manifest = {
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "seasons": infos,
+        "health": health,
     }
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
 

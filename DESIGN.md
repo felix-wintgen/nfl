@@ -15,12 +15,13 @@ All data comes from the `nflverse/nflverse-data` GitHub releases:
 
 - **We mirror the data.** GitHub release downloads have no CORS headers, so the browser can't read them; the pipeline writes slim per-season parquet files into the site.
 - **No current-season participation.** nflverse publishes it after the season. Personnel, formation and coverage come from last season and are labelled that way; the pipeline picks the file up if it appears.
-- **nflverse timing.** Play-by-play is refreshed daily in season (09:03 UTC) and after each game window, injuries at 07:07, rosters around 06:00. The daily build at 10:00 UTC runs after all of them. It's a volunteer project with no SLA; a failed sanity check stops the deploy and the last good site stays up.
+- **nflverse timing.** Play-by-play is refreshed daily in season (09:03 UTC) and after each game window, injuries at 07:07, rosters around 06:00. The daily build at 10:17 UTC (off the hour, where GitHub delays scheduled runs least) runs after all of them; GitHub can still start it hours late or skip a day, and pushes rebuild too. It's a volunteer project with no SLA; a failed sanity check stops the deploy and the last good site stays up.
+- **nflverse gaps we've seen.** The schedule's starting-QB columns are the pre-game listing and often stay that way after the game (57 games 2022–2026 list a QB who didn't start). Weather and referee are filled in only after a game. Rows for a new playoff round arrive over about 12 hours after the matchups are set. Each build logs a data-health record (also in `manifest.json`): what triggered it, missing files, played games whose plays aren't in yet, teams without an injury report, and how often the board leaned on nflverse's listed QB. It changes nothing on the board; it's the record for deciding which gap needs handling.
 
 ## Architecture
 
 ```
-GitHub Action (every push, daily 10:00 UTC)
+GitHub Action (every push, daily 10:17 UTC)
   └─ pipeline/build.py (Python + DuckDB)
        download, join pbp ⟷ participation ⟷ FTN per play, derive columns
        write static/data/plays_{season}.parquet, teams.json, games.json, matchups.json, manifest.json
@@ -49,6 +50,8 @@ A broadcast spotting board: **someone who tunes in with seconds to spare knows w
 **Before the final injury report** (Friday for Sunday games, Saturday for Monday), nobody has a game status. Players show "Missed last game", "Did not practice" or "Limited in practice" instead. 2022–2025: missed last game alone is a coin flip (52% sat again: 98% if still not practicing, 3% if practicing fully); with practice status it catches 79% of the players who ended up inactive. The report counts as out once any player on the team has a game status, or from the day before kickoff. Once a game is played, only "Out" is kept.
 
 **The starter** is last game's QB, unless a QB with real starts is back from being ruled out. That exception waits for the final report: replayed 2022–2026, it was right 28% of the time midweek and 48% after the report. It also needs the returning QB to have started the last game he played in, so a former starter who lost the job (Fields to Wilson, 2024) doesn't get it back. In the playoffs, a Week 18 game in which the season's dropback leader sat or played only a series, without being listed out for an injury, doesn't count as "last game", for the QB or for "missed last game"; nflverse marks rest as "Not injury related - resting player". Replayed 2022–2025 against the QB who threw the team's first pass: regular season 94.6% after the report (93.8% midweek), Wild Card round 95.8% (was 70.8%), later rounds 98.2%. The misses that remain are mostly coach's decisions, which the data can't see.
+
+**nflverse's listed starter** (the schedule's QB columns, filled about two days before kickoff) is a second opinion. It names the QB when we have no dropbacks for anyone available (Week 1, a backup who hasn't played), and when it names someone else who isn't ruled out, the board shows both: "Or #6 Jaxson Dart: nflverse lists him to start." Replayed 2022–2026 with the listing as it stood before kickoff: regular season, the first name is right 95.4% after the report, two names show on 5.3% of boards and one of them is right every time, and a single wrong name is left on 1.2% (5.4% before, counting blanks). Week 1 goes from no QB to 99.4%.
 
 **The four targets** are picked by share over the games they were active for, once they have 2 games and 8 targets; raw counts before that. A receiver back from suspension or newly traded isn't buried under season totals (Rice and Meyers, 2025). Replayed 2022–2026: the game's target leader was on the board 92.0% of the time (89.8% by count), at 0.52 changed names per board per week instead of 0.47. Backs stay sorted by carries: share moved the game's rushing leader onto the board only 0.4 points more often, not worth the extra rule.
 
