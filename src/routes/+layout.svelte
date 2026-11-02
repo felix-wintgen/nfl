@@ -68,8 +68,9 @@
 	Play-by-play and NGS participation data:
 	<a href="https://github.com/nflverse">nflverse</a> (CC-BY 4.0), models by
 	<a href="https://nflfastr.com">nflfastR</a>. Charting data:
-	<a href="https://ftndata.com">ftndata.com</a> via nflverse (CC-BY-SA 4.0). NFL data belongs to its
-	respective owners. <a href="https://github.com/felix-wintgen/nfl">Source code</a> (MIT).
+	<a href="https://ftndata.com">ftndata.com</a> via nflverse (CC-BY-SA 4.0). NFL data, team names
+	and logos belong to the NFL and its teams; NFL Scout is not affiliated with or endorsed by the
+	NFL. <a href="https://github.com/felix-wintgen/nfl">Source code</a> (MIT).
 </footer>
 
 <style>

@@ -54,4 +54,4 @@ NFL Scout stands on nflverse: the data and the models behind its efficiency numb
 
 The code is MIT-licensed ([LICENSE](LICENSE)); the license doesn't cover the data.
 
-Most nflverse data (play-by-play, NGS participation) is CC-BY 4.0. FTN charting data is CC-BY-SA 4.0 and must be credited to "ftndata.com via nflverse"; the site footer does both. The NFL data belongs to its respective owners.
+Most nflverse data (play-by-play, NGS participation) is CC-BY 4.0. FTN charting data is CC-BY-SA 4.0 and must be credited to "ftndata.com via nflverse"; the site footer does both. NFL data, team names and logos belong to the NFL and its teams; NFL Scout is not affiliated with or endorsed by the NFL.
