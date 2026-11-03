@@ -35,7 +35,7 @@
 	<meta name="apple-mobile-web-app-title" content="NFL Scout" />
 	<meta
 		name="description"
-		content="Opponent scouting for NFL coordinators: offensive tendencies and tells, defensive packages, coverage and pressure, built on nflverse data."
+		content="A game-day spotting board for this week's NFL games: who gets the ball, who's out, what the broadcast will talk about. Then dig deeper into offensive tendencies, defensive packages, coverage and pressure. Built on nflverse data."
 	/>
 </svelte:head>
 

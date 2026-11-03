@@ -20,7 +20,9 @@
 </svelte:head>
 
 <h1>NFL Scout</h1>
-<p class="muted">Opponent scouting built on nflverse data.</p>
+<p class="muted">
+	Get in sync with the broadcast in 30 seconds, then dig deeper. Built on nflverse data.
+</p>
 
 <div class="tools">
 	<a class="card" href={resolve('/matchup')}>
