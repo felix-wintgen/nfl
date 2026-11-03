@@ -79,7 +79,7 @@
 	})) as IdentityItem[];
 </script>
 
-<Scout side="defense" title="OC helper" question="What am I expecting?">
+<Scout side="defense" title="OC helper" question="What beats their defense?">
 	{#snippet children(filters)}
 		<IdentityCard {filters} side="defense" items={identity} />
 		<Packages {filters} />

@@ -31,11 +31,11 @@
 	</a>
 	<a class="card" href={resolve('/dc')}>
 		<h2>DC helper</h2>
-		<p>Scout the opposing offense: <em>what am I facing?</em></p>
+		<p>Tendencies, personnel and tells: <em>how do we beat their offense?</em></p>
 	</a>
 	<a class="card" href={resolve('/oc')}>
 		<h2>OC helper</h2>
-		<p>Scout the opposing defense: <em>what am I expecting?</em></p>
+		<p>Packages, coverage and pressure: <em>what beats their defense?</em></p>
 	</a>
 </div>
 

@@ -57,7 +57,7 @@
 	];
 </script>
 
-<Scout side="offense" title="DC helper" question="What am I facing?">
+<Scout side="offense" title="DC helper" question="How do we beat their offense?">
 	{#snippet children(filters)}
 		<IdentityCard {filters} side="offense" items={identity} />
 		<Tells {filters} />
