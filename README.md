@@ -1,6 +1,6 @@
 # NFL Scout
 
-Opponent-scouting tools built on [nflverse](https://github.com/nflverse) data: a **DC helper** (scout the opposing offense) and an **OC helper** (scout the opposing defense). It's a static SvelteKit site, with DuckDB-WASM querying parquet files in the browser. Why it works the way it does: [DESIGN.md](DESIGN.md).
+NFL Scout is built on [nflverse](https://github.com/nflverse) data. **Game day** is the entry point: a spotting board that gets you in sync with the broadcast in 30 seconds. It shows who gets the ball, who's out, and what the commentators are likely to talk about. From there, the **DC helper** and **OC helper** dig down into the opposing offense and defense by situation, with the queries running in your browser. It's a static SvelteKit site, with DuckDB-WASM querying parquet files. Why it works the way it does: [DESIGN.md](DESIGN.md).
 
 ## Setup
 
@@ -15,7 +15,7 @@ npm run dev
 
 ## Data pipeline
 
-`pipeline/build.py` downloads play-by-play, NGS participation and FTN charting from the nflverse-data releases. It caches them in `pipeline/.cache`, joins them per play, and writes one slim `static/data/plays_{season}.parquet` per season, plus `fourth_{season}.parquet` with every 4th down including punts and field goals (for go-for-it rates). It also writes `teams.json`, `games.json`, `matchups.json` and `manifest.json`.
+`pipeline/build.py` downloads play-by-play, NGS participation and FTN charting from the nflverse-data releases. It caches them in `pipeline/.cache`, joins them per play, and writes one slim `static/data/plays_{season}.parquet` per season, plus `fourth_{season}.parquet` with every 4th down including punts and field goals (for go-for-it rates). It also writes `teams.json`, `games.json`, `matchups.json` and `manifest.json`. Each build prints a data-health record, also stored in `manifest.json`: what triggered the build, missing nflverse files, played games whose plays aren't in yet, teams without an injury report, and how often Game day leaned on nflverse's listed QB. Look there first when a board looks off.
 
 The derived columns (personnel grouping, defensive package, distance bucket, field zone …) are DuckDB macros in `pipeline/derive.py`, tested in `pipeline/tests/` (`npm run data:test`).
 
@@ -27,7 +27,14 @@ Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-dow
 
 ## Game day
 
-`/matchup` is a spotting board for the upcoming week: the line, both offenses' QB, top targets and backfield with role labels ("go-to guy", "workhorse" …) and who's out. Until a team's final injury report is out, players show whether they missed the last game and how they practiced. `pipeline/matchup.py` writes `static/data/matchups.json` from this season's usage (counting only the games each player was active for) plus nflverse rosters and injury reports; the labels are sticky (earned at one bar, kept until clearly below a lower one). `src/lib/broadcast.ts` words them, with a few random variants per label.
+`/matchup` is a spotting board for the upcoming week, for someone who tunes in with seconds to spare. Per game: the line with the implied score and win probability (from the moneylines, bookmaker's margin removed), regular-season records, and for each offense:
+
+- **The starting QB**: last game's starter, unless a former starter is back from being ruled out. When nflverse lists someone else to start, the board names both.
+- **Four targets** by share of the targets in the games they were active for, and the **backfield** by carries.
+- **Role labels** ("go-to guy", "workhorse", "turnover watch" …). They're sticky: earned at one bar, kept until clearly below a lower one.
+- **Who's out.** Until a team's final injury report is out, players show whether they missed the last game and how they practiced instead.
+
+`pipeline/matchup.py` writes `static/data/matchups.json` from this season's play-by-play plus nflverse schedules, rosters, injury reports and snap counts; `src/lib/broadcast.ts` words it, with a few random variants per label. The board runs from the season opener through the Super Bowl; before the opener there's no current-season play-by-play, so there's no board. Why the rules are what they are, with the replays behind them: [DESIGN.md](DESIGN.md#game-day).
 
 ## Known data gaps
 
