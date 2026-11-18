@@ -705,7 +705,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             targets.append({**person(pid), "stats": st, "labels": now + extra, "new": new + extra})
             if len(targets) == 4:
                 break
-        # One go-to guy per team: a second one who only holds on by the stay rule steps down.
+        # One go-to guy per team: a second one with the label steps down for the leading one.
         for t in targets[1:]:
             if "go_to" in t["labels"] and "go_to" in targets[0]["labels"]:
                 t["labels"] = [l for l in t["labels"] if l != "go_to"]

@@ -38,13 +38,25 @@ There is no server: queries run in the visitor's browser, so the build costs the
 
 Derived columns (personnel grouping, defensive package, distance bucket, field zone, score state …) are DuckDB macros in `pipeline/derive.py`, computed once so the frontend SQL stays simple.
 
+## DC and OC helpers
+
+Where Game day is the 30-second view, the helpers dig down: the DC helper scouts an offense (situational tendencies, personnel and formation, run game, pass game, tells), the OC helper a defense (packages against your personnel, coverage, pressure, what works against them).
+
+**Everything against the league, under the same filters.** A number alone means little; every one is shown next to the league's in the same situation (play-weighted) and ranked among all teams under the same filters. The filters (seasons, regular season or playoffs, downs, distance, field zone, score, two-minute, home/away, last 4 or 8 games) apply to the league too, so "3rd & 3–6 in the red zone" compares like with like. "Last 4 games" keeps each team's own last four, not the scouted team's dates. Filters live in the URL, so every view is a shareable link.
+
+**Two seasons by default.** The current season has no participation data (personnel, formation, coverage, routes, pressure) until nflverse publishes it after the season; with last season selected too, those sections fill from it and say so. Pistol is split out from shotgun only when every selected season has formation data; otherwise the two are shown together.
+
+**Tells** are situation combinations (personnel, alignment, down, distance, field zone, in the pairs and triples a coordinator would call out) where an offense's run/pass mix departs from the league's in the same combination. A team's rate is pulled toward the league by 90 plays' worth of league average before comparing: fitted by `pipeline/tells_backtest.py` (tells picked from weeks 1–9, checked on weeks 10–18), unshrunk tells kept only 32–44% of their gap in the second half (2023–2025), shrunk ones 79–105%. A tell needs 12 plays and a 5-point gap after shrinking; they're ranked by that expected gap, so a big sample with a moderate gap beats a tiny extreme one, up to eight are shown, and the same tell said twice ("1st down" and "1st & 7–10", same direction) is shown once. Rerun the backtest once a season is complete (`npm run data:backtest`).
+
+**Colors** are from the point of view the section serves: tendencies above or below the league in orange and blue, the pressure profile from the defense's side, "What works against them" from your offense's (green: it works).
+
 ## Game day
 
 A broadcast spotting board: **someone who tunes in with seconds to spare knows who matters and what the broadcast will say about them.** Built around the offenses (the defense shows up as who's missing; its tendencies stay in the OC helper), plain broadcast wording, around players, not team metrics. It tells you what you'll hear, not what will happen.
 
 **Why usage.** A player's share of targets, air yards and carries carries over to the next game (r = 0.56–0.82, 2022–2026); his EPA per touch doesn't (r ≈ 0.08). Role labels rest on usage, so they hold. The rules live in `pipeline/matchup.py`, the wording in `src/lib/broadcast.ts`.
 
-**Sticky labels.** Each label has a bar to earn it and a lower bar to keep it, replayed week by week, so the daily rebuild only changes labels after a game.
+**Sticky labels.** Each label has a bar to earn it and a lower bar to keep it, replayed week by week, so the daily rebuild only changes labels after a game. The bars, in plain words, are in the tag legend below the boards (`ABOUT` in `src/lib/broadcast.ts`, matching `pipeline/matchup.py`); that legend is the user-facing reference, so they aren't repeated here.
 
 **Active games only.** Shares count only the games a player was active for (weekly roster, or he touched the ball): a missed game is missing data, not zero targets. "On the rise" skips games missed injured but counts healthy scratches as zero, so coming back from injury isn't "rising". Replayed 2022–2026: only players who missed games change; labels fire 4–15 points more often (go-to guy in 74% of team-weeks instead of 59%) and flip less. The bars weren't raised back to the old frequencies: that would take labels from healthy players (Henry 2023, Hill 2024).
 
@@ -55,6 +67,10 @@ A broadcast spotting board: **someone who tunes in with seconds to spare knows w
 **Two more opinions: nflverse's listed starter and the depth chart.** The schedule's QB columns are filled about two days before kickoff; nflverse's depth charts are daily snapshots, and caught trades first (Cousins to Minnesota, 2026: QB1 on their depth chart days before his first game for them). Each is skipped if its QB is unavailable. **After the final report, the first name is the one two of the three agree on**, else the depth chart's; the other name is shown too, with where it comes from ("Or #8 Kirk Cousins: first on the depth chart."). **Before the report, ours stays first**: the listing and the depth chart lag behind injuries (a hurt starter stays QB1 on the depth chart: McCarthy, Lamar Jackson, Purdy 2025). Replayed with each source as the 08:50 UTC build would have seen it, against the QB who threw the team's first pass (2025 and 2026 through Week 10, when the depth chart is daily): after the report, the first name is right 99.1% and 98.7% (ours alone 96.7% and 96.0%; nflverse's listing first, 97.0% and 94.0%), and either name 100% and 99.3%; midweek 95.0% and 94.4%. When ours and the listing disagree, the depth chart sides with the right one 40 times out of 46. Taking the depth chart over both others is a loss (right 8 times, wrong 12), so it only ever breaks a tie or fills a blank. Most misses left are Week 18 rest, where the listing names the backup and is shown second.
 
 **The four targets** are picked by share over the games they were active for, once they have 2 games and 8 targets; raw counts before that. A receiver back from suspension or newly traded isn't buried under season totals (Rice and Meyers, 2025). Replayed 2022–2026: the game's target leader was on the board 92.0% of the time (89.8% by count), at 0.52 changed names per board per week instead of 0.47. Backs stay sorted by carries: share moved the game's rushing leader onto the board only 0.4 points more often, not worth the extra rule.
+
+**Smaller rules on the board.** One go-to guy per team: if a second receiver also has the label, he steps down for the one with the bigger share. The backfield is a workhorse, a lead back, or a committee when the top back has under half the carries; two backs show, a third only with a label. "New:" with a golden fill marks a label earned since last week; "New starter" and "Back from injury" mark a QB change. The QB exception for a starter back from injury needs 60+ dropbacks this season and a game ruled out in the last three weeks.
+
+**Which week.** The board shows the lowest week with a game not yet played: a game already played that week shows its final score, and the board moves on once every game is final, usually Tuesday morning after Monday night. The page opens on the next game, counting a game as live for four hours after kickoff.
 
 **Records, points and ranks** are the regular season's, so a playoff team isn't 13-5. Neutral sites (Super Bowl, international games) read "vs.", not "at".
 
