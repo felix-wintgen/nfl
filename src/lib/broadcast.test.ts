@@ -160,11 +160,17 @@ describe('who is out', () => {
 				board([off], [d('Out', true), d('Injured reserve', false), d('Questionable', false)]),
 				'Lions'
 			)
-		).toBe('The Lions are without 3 regulars, 1 of them new this week.');
+		).toBe('The Lions are without 3 regulars, 1 of them new this week; 1 more is in doubt.');
 		expect(teamOutLine(board([], [d('Out', true)]), 'Lions')).toBe(
 			'The Lions are without one regular, new this week.'
 		);
-		expect(teamOutLine(board([], [d('Questionable', false)]), 'Lions')).toBe('');
+		expect(
+			teamOutLine(board([], [d('Injured reserve', false), d('Missed last game', false)]), 'Bears')
+		).toBe('The Bears are without one regular; 1 more is in doubt.');
+		expect(teamOutLine(board([], [d('Questionable', false)]), 'Lions')).toBe(
+			'The Lions have one regular in doubt.'
+		);
+		expect(teamOutLine(board([], []), 'Lions')).toBe('');
 	});
 
 	it('says when he last played', () => {

@@ -325,13 +325,16 @@ export function outLine(o: OutPlayer): string {
 
 const MISSING = ['Out', 'Injured reserve', 'Doubtful'];
 
-/** "The Lions are without 5 regulars, 1 of them new this week." Counts players out for sure,
- * offense and defense; empty if there are none. */
+/** "The Lions are without 5 regulars, 1 of them new this week; 1 more is in doubt." Out for
+ * sure (out, injured reserve, doubtful) is counted; questionable, or missed last game before
+ * the report, is "in doubt". Empty if nobody is listed. */
 export function teamOutLine(b: Board, nick: string): string {
-	const out = [...b.out, ...(b.def_out ?? [])].filter((o) => MISSING.includes(o.status));
-	if (!out.length) return '';
+	const all = [...b.out, ...(b.def_out ?? [])];
+	const out = all.filter((o) => MISSING.includes(o.status));
+	const doubt = all.length - out.length;
+	const regulars = (n: number) => (n === 1 ? 'one regular' : `${n} regulars`);
+	if (!out.length) return doubt ? `The ${nick} have ${regulars(doubt)} in doubt.` : '';
 	const fresh = out.filter((o) => o.new).length;
-	const who = out.length === 1 ? 'one regular' : `${out.length} regulars`;
 	const news = !fresh
 		? ''
 		: out.length === 1
@@ -339,7 +342,8 @@ export function teamOutLine(b: Board, nick: string): string {
 			: fresh === out.length
 				? ', all new this week'
 				: `, ${fresh} of them new this week`;
-	return `The ${nick} are without ${who}${news}.`;
+	const more = doubt ? `; ${doubt} more ${doubt === 1 ? 'is' : 'are'} in doubt` : '';
+	return `The ${nick} are without ${regulars(out.length)}${news}${more}.`;
 }
 
 /** "94% of the defensive snaps · hip · last played Week 8." */
