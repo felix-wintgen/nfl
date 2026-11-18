@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { ABOUT, boardTags, LABELS } from '#lib/broadcast.ts';
 	import OffenseBoard from '#lib/components/matchup/OffenseBoard.svelte';
+	import TeamOut from '#lib/components/matchup/TeamOut.svelte';
 	import { weekLabel } from '#lib/format.ts';
 	import {
 		favorite,
@@ -194,20 +195,13 @@
 		</header>
 
 		<div class="boards">
-			<OffenseBoard
-				board={game.boards.away}
-				team={away}
-				opponent={home}
-				defense={game.boards.home.def_out ?? []}
-				season={data.season}
-			/>
-			<OffenseBoard
-				board={game.boards.home}
-				team={home}
-				opponent={away}
-				defense={game.boards.away.def_out ?? []}
-				season={data.season}
-			/>
+			<OffenseBoard board={game.boards.away} team={away} opponent={home} season={data.season} />
+			<OffenseBoard board={game.boards.home} team={home} opponent={away} season={data.season} />
+		</div>
+
+		<div class="boards outs">
+			<TeamOut board={game.boards.away} team={away} season={data.season} />
+			<TeamOut board={game.boards.home} team={home} season={data.season} />
 		</div>
 
 		{#if legend.length}
@@ -362,6 +356,10 @@
 		display: inline;
 		margin: 0;
 		color: var(--muted-strong);
+	}
+	.boards.outs {
+		align-items: start;
+		margin-top: 1rem;
 	}
 	.boards {
 		display: grid;

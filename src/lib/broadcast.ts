@@ -325,9 +325,10 @@ export function outLine(o: OutPlayer): string {
 
 const MISSING = ['Out', 'Injured reserve', 'Doubtful'];
 
-/** "The Lions defense is without 3 regulars, 1 of them new this week." Empty if nobody is out for sure. */
-export function defenseLine(d: DefOutPlayer[], nick: string): string {
-	const out = d.filter((o) => MISSING.includes(o.status));
+/** "The Lions are without 5 regulars, 1 of them new this week." Counts players out for sure,
+ * offense and defense; empty if there are none. */
+export function teamOutLine(b: Board, nick: string): string {
+	const out = [...b.out, ...(b.def_out ?? [])].filter((o) => MISSING.includes(o.status));
 	if (!out.length) return '';
 	const fresh = out.filter((o) => o.new).length;
 	const who = out.length === 1 ? 'one regular' : `${out.length} regulars`;
@@ -338,7 +339,7 @@ export function defenseLine(d: DefOutPlayer[], nick: string): string {
 			: fresh === out.length
 				? ', all new this week'
 				: `, ${fresh} of them new this week`;
-	return `The ${nick} defense is without ${who}${news}.`;
+	return `The ${nick} are without ${who}${news}.`;
 }
 
 /** "94% of the defensive snaps · hip · last played Week 8." */

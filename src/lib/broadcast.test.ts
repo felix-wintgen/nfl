@@ -6,14 +6,14 @@ const {
 	LABELS,
 	backLine,
 	boardTags,
-	defenseLine,
 	defOutLine,
 	healthTags,
 	mainLabel,
 	outLine,
 	statusKey,
 	targetLine,
-	teamLine
+	teamLine,
+	teamOutLine
 } = await import('./broadcast.ts');
 const { favorite, kickoff, nextGame } = await import('./matchups.ts');
 
@@ -140,7 +140,7 @@ describe('lines', () => {
 	});
 });
 
-describe('their defense', () => {
+describe('who is out', () => {
 	const d = (status: string, isNew: boolean, last = { season: 2026, week: 8 }) => ({
 		...person,
 		pos: 'LB',
@@ -151,14 +151,20 @@ describe('their defense', () => {
 		new: isNew
 	});
 
-	it('counts regulars out for sure, and how many are new', () => {
+	it('counts regulars out for sure across offense and defense, and how many are new', () => {
+		const board = (out: object[], def: object[]) =>
+			({ out, def_out: def }) as unknown as Parameters<typeof teamOutLine>[0];
+		const off = { ...person, status: 'Out', new: false };
 		expect(
-			defenseLine([d('Out', true), d('Injured reserve', false), d('Questionable', false)], 'Lions')
-		).toBe('The Lions defense is without 2 regulars, 1 of them new this week.');
-		expect(defenseLine([d('Out', true)], 'Lions')).toBe(
-			'The Lions defense is without one regular, new this week.'
+			teamOutLine(
+				board([off], [d('Out', true), d('Injured reserve', false), d('Questionable', false)]),
+				'Lions'
+			)
+		).toBe('The Lions are without 3 regulars, 1 of them new this week.');
+		expect(teamOutLine(board([], [d('Out', true)]), 'Lions')).toBe(
+			'The Lions are without one regular, new this week.'
 		);
-		expect(defenseLine([d('Questionable', false)], 'Lions')).toBe('');
+		expect(teamOutLine(board([], [d('Questionable', false)]), 'Lions')).toBe('');
 	});
 
 	it('says when he last played', () => {

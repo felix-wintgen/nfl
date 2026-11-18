@@ -3,31 +3,24 @@
 	import {
 		backfieldLine,
 		backLine,
-		defenseLine,
-		defOutLine,
-		outLine,
 		qbLine,
 		qbSecondLine,
-		statusKey,
 		healthTags,
 		tags,
 		targetLine,
 		teamLine
 	} from '#lib/broadcast.ts';
-	import type { Board, DefOutPlayer } from '#lib/matchups.ts';
+	import type { Board } from '#lib/matchups.ts';
 	import type { Team } from '#lib/meta.ts';
 	import Tag from './Tag.svelte';
 
-	// One half of the spotting board: when this team has the ball. `defense` is the
-	// opponent's missing defenders: they matter on this team's possessions.
+	// One half of the spotting board: when this team has the ball. Who's out is per team, below.
 	let {
 		board,
 		team,
 		opponent,
-		defense,
 		season
-	}: { board: Board; team: Team; opponent: Team; defense: DefOutPlayer[]; season: number } =
-		$props();
+	}: { board: Board; team: Team; opponent: Team; season: number } = $props();
 
 	// Worded once per page load: a reload may phrase things differently, the facts stay put.
 	const lines = $derived({
@@ -35,8 +28,7 @@
 		qb: board.qb ? [qbLine(board.qb), qbSecondLine(board.qb)].filter((l) => l) : [],
 		targets: board.targets.map((t) => targetLine(t)),
 		backs: board.backs.map((b, i) => backLine(b, i === 0 && board.backfield === 'lead')),
-		backfield: backfieldLine(board),
-		defense: defenseLine(defense, opponent.nick)
+		backfield: backfieldLine(board)
 	});
 
 	const isNew = (tag: string, fresh: string[]) =>
@@ -133,35 +125,6 @@
 		</div>
 	{/each}
 
-	{#if board.out.length}
-		<h3>Who's out</h3>
-		<ul class="out">
-			{#each board.out as o (o.id)}
-				<li>
-					<Tag key={statusKey(o.status)} text={o.status} tone="warn" />
-					<strong>#{o.jersey ?? '–'} {o.name}</strong>
-					<span class="pos">{o.pos}</span>
-					<span class="muted">{outLine(o)}</span>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-
-	{#if defense.length}
-		<h3>{opponent.nick} defense: who's out</h3>
-		{#if lines.defense}<p class="line">{lines.defense}</p>{/if}
-		<ul class="out">
-			{#each defense as o (o.id)}
-				<li>
-					<Tag key={statusKey(o.status)} text={o.status} tone="warn" fresh={o.new} />
-					<strong>#{o.jersey ?? '–'} {o.name}</strong>
-					<span class="pos">{o.pos}</span>
-					<span class="muted">{defOutLine(o, season)}</span>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-
 	{#if board.report_pending}
 		<p class="pending muted">
 			Final injury report not out yet: tags show last game and this week's practice.
@@ -242,19 +205,6 @@
 		font-size: 0.78rem;
 		color: var(--muted);
 		font-variant-numeric: tabular-nums;
-	}
-	.out {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		font-size: 0.88rem;
-	}
-	.out li {
-		padding: 0.3rem 0;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.3rem 0.4rem;
-		align-items: baseline;
 	}
 	.pending {
 		margin: 0.75rem 0 0;

@@ -82,9 +82,11 @@ export interface OutPlayer extends Person {
 	by_snaps?: boolean;
 	labels: string[];
 	next?: { name: string; share: number };
+	/** He played the last game: this just happened. */
+	new?: boolean;
 }
 
-/** A regular on this team's defense who is out (shown on the other team's board). */
+/** A regular on this team's defense who is out. */
 export interface DefOutPlayer extends Person {
 	status: string;
 	/** Share of the defensive snaps in the games he played (last season's if none this season). */

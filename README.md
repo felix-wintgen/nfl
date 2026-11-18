@@ -32,7 +32,7 @@ Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-dow
 - **The starting QB**: last game's starter, unless a former starter is back from being ruled out. When nflverse lists someone else to start, the board names both.
 - **Four targets** by share of the targets in the games they were active for, and the **backfield** by carries.
 - **Role labels** ("go-to guy", "workhorse", "turnover watch" …). They're sticky: earned at one bar, kept until clearly below a lower one.
-- **Who's out**, ordered by impact: the offense's missing players, and on the other team's board the defense's missing regulars, with who's new this week. Until a team's final injury report is out, players show whether they missed the last game and how they practiced instead.
+- **Who's out** per team, below the boards: missing offensive players and defensive regulars, ordered by impact, with who's new this week. Until a team's final injury report is out, players show whether they missed the last game and how they practiced instead.
 
 `pipeline/matchup.py` writes `static/data/matchups.json` from this season's play-by-play plus nflverse schedules, rosters, injury reports and snap counts; `src/lib/broadcast.ts` words it, with a few random variants per label. The board runs from the season opener through the Super Bowl; before the opener there's no current-season play-by-play, so there's no board. Why the rules are what they are, with the replays behind them: [DESIGN.md](DESIGN.md#game-day).
 
