@@ -422,29 +422,34 @@ def snap_shares(con: duckdb.DuckDBPyConnection, snaps_file: Path, roster_file: P
 
 
 def defense_regulars(con: duckdb.DuckDBPyConnection, snaps_file: Path, prev_snaps_file: Optional[Path],
-                     roster_file: Path, season: int, week: int) -> Dict[str, Dict]:
-    """Defenders who are regulars, by gsis id: share of the defensive snaps in the games
-    he played, the last week he played and his team then. This season's games decide;
-    last season's only for a player without a defensive snap this season."""
+                     roster_file: Path, season: int, week: int) -> Dict[Tuple[str, str], Dict]:
+    """Defensive regulars by (gsis id, team): share of the defensive snaps in the games he
+    played for that team, how many, and the last week. Only snaps for the team count, so a
+    player traded in isn't a regular before he's played for them; and it takes two games
+    (one if the team has played only one). Last season's snaps count only for a player
+    without a defensive snap this season."""
     ids = f"""(SELECT DISTINCT pfr_id, gsis_id FROM read_parquet('{roster_file}')
                WHERE pfr_id IS NOT NULL AND gsis_id IS NOT NULL)"""
-    now = {r["id"]: {**r, "season": season} for r in _rows(con, f"""
-        SELECT ids.gsis_id AS id, avg(s.defense_pct) AS share, count(*) AS games,
-               max(s.week) AS week, arg_max(s.team, s.week) AS team
-        FROM read_parquet('{snaps_file}') s JOIN {ids} ids ON ids.pfr_id = s.pfr_player_id
-        WHERE s.season = {season} AND s.week < {week} AND s.defense_snaps > 0
-        GROUP BY 1""")}
-    before = {}
+
+    def per_team(file: Path, yr: int, extra: str = "") -> List[Dict]:
+        return _rows(con, f"""
+            SELECT ids.gsis_id AS id, s.team, avg(s.defense_pct) AS share, count(*) AS games, max(s.week) AS week
+            FROM read_parquet('{file}') s JOIN {ids} ids ON ids.pfr_id = s.pfr_player_id
+            WHERE s.season = {yr} AND s.defense_snaps > 0 {extra}
+            GROUP BY ALL""")
+
+    team_games = {r["team"]: r["n"] for r in _rows(con, f"""
+        SELECT team, count(DISTINCT game_id) AS n FROM read_parquet('{snaps_file}')
+        WHERE season = {season} AND week < {week} GROUP BY 1""")}
+    now = per_team(snaps_file, season, f"AND s.week < {week}")
+    played_now = {r["id"] for r in now}
+    regulars = {(r["id"], r["team"]): {**r, "season": season} for r in now
+                if r["share"] >= DEF_REGULAR_BAR and r["games"] >= min(2, team_games.get(r["team"], 0))}
     if prev_snaps_file:
-        before = {r["id"]: {**r, "season": season - 1} for r in _rows(con, f"""
-            SELECT ids.gsis_id AS id, avg(s.defense_pct) AS share, count(*) AS games,
-                   max(s.week) AS week, arg_max(s.team, s.week) AS team
-            FROM read_parquet('{prev_snaps_file}') s JOIN {ids} ids ON ids.pfr_id = s.pfr_player_id
-            WHERE s.season = {season - 1} AND s.game_type = 'REG' AND s.defense_snaps > 0
-            GROUP BY 1""")}
-    regulars = {pid: r for pid, r in now.items() if r["share"] >= DEF_REGULAR_BAR}
-    regulars.update({pid: r for pid, r in before.items() if pid not in now and r["share"] >= DEF_REGULAR_BAR
-                     and r["games"] >= DEF_LAST_SEASON_GAMES})
+        regulars.update({(r["id"], r["team"]): {**r, "season": season - 1}
+                         for r in per_team(prev_snaps_file, season - 1, "AND s.game_type = 'REG'")
+                         if r["id"] not in played_now and r["share"] >= DEF_REGULAR_BAR
+                         and r["games"] >= DEF_LAST_SEASON_GAMES})
     return regulars
 
 
@@ -727,9 +732,9 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
 
         # This team's defense: its regulars who are out, by usual snap share. "New": he played the last game.
         def_out = []
-        for pid, reg in regulars.items():
+        for (pid, reg_team), reg in regulars.items():
             r = defense.get(pid)
-            if not r or r.get("team") != team or (reg["season"] < season and reg["team"] != team):
+            if reg_team != team or not r or r.get("team") != team:
                 continue
             rep = def_report.get(pid)
             if rep:

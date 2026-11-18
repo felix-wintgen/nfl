@@ -159,19 +159,27 @@ def test_record():
     assert record([]) == "0-0"
 
 
-def test_defense_regulars_this_season_decides_last_season_fills_in(tmp_path):
+def test_defense_regulars_count_snaps_for_the_team_only(tmp_path):
     import duckdb
     con = duckdb.connect()
     roster, now, before = tmp_path / "roster.parquet", tmp_path / "now.parquet", tmp_path / "before.parquet"
-    con.execute(f"""COPY (SELECT * FROM (VALUES ('pa', 'A'), ('pb', 'B'), ('pc', 'C'), ('pd', 'D'))
+    con.execute(f"""COPY (SELECT * FROM (VALUES ('pa', 'A'), ('pb', 'B'), ('pc', 'C'), ('pd', 'D'), ('pe', 'E'), ('pf', 'F'))
                     t(pfr_id, gsis_id)) TO '{roster}' (FORMAT parquet)""")
-    snaps = """SELECT * FROM (VALUES {}) t(season, game_type, week, pfr_player_id, team, defense_snaps, defense_pct)"""
-    con.execute(f"""COPY ({snaps.format("(2026, 'REG', 1, 'pa', 'DET', 60, 0.9), (2026, 'REG', 1, 'pb', 'DET', 20, 0.3)")})
-                    TO '{now}' (FORMAT parquet)""")
-    rows = ", ".join([f"(2025, 'REG', {w}, 'pb', 'DET', 60, 0.9)" for w in range(1, 7)]
-                     + [f"(2025, 'REG', {w}, 'pc', 'GB', 50, 0.8)" for w in range(1, 7)]
-                     + [f"(2025, 'REG', {w}, 'pd', 'GB', 50, 0.8)" for w in range(1, 3)])
-    con.execute(f"COPY ({snaps.format(rows)}) TO '{before}' (FORMAT parquet)")
-    regs = defense_regulars(con, now, before, roster, 2026, 2)
-    assert set(regs) == {"A", "C"}  # B: this season he's part-time; D: too few games last season
-    assert regs["C"]["season"] == 2025 and regs["C"]["team"] == "GB"
+    snaps = """SELECT * FROM (VALUES {}) t(season, game_type, week, game_id, pfr_player_id, team, defense_snaps, defense_pct)"""
+    rows = []
+    for w in (1, 2, 3):
+        rows += [f"(2026, 'REG', {w}, 'g{w}', 'pa', 'DET', 60, 0.9)", f"(2026, 'REG', {w}, 'g{w}', 'pb', 'DET', 20, 0.3)",
+                 f"(2026, 'REG', {w}, 'j{w}', 'zz', 'JAX', 60, 0.9)"]  # Jacksonville has played three games
+    rows += ["(2026, 'REG', 1, 'g1', 'pe', 'ATL', 60, 0.9)", "(2026, 'REG', 2, 'g2', 'pe', 'ATL', 60, 0.9)",
+             "(2026, 'REG', 3, 'g3', 'pe', 'JAX', 60, 0.9)",  # traded: one game for Jacksonville
+             "(2026, 'REG', 3, 'g3', 'pf', 'DET', 60, 0.9)"]  # one game: not yet a regular
+    con.execute(f"COPY ({snaps.format(', '.join(rows))}) TO '{now}' (FORMAT parquet)")
+    prev = ", ".join([f"(2025, 'REG', {w}, 'x{w}', 'pb', 'DET', 60, 0.9)" for w in range(1, 7)]
+                     + [f"(2025, 'REG', {w}, 'x{w}', 'pc', 'GB', 50, 0.8)" for w in range(1, 7)]
+                     + [f"(2025, 'REG', {w}, 'x{w}', 'pd', 'GB', 50, 0.8)" for w in range(1, 3)])
+    con.execute(f"COPY ({snaps.format(prev)}) TO '{before}' (FORMAT parquet)")
+    regs = defense_regulars(con, now, before, roster, 2026, 4)
+    # A: a starter. B: part-time this season, last season doesn't count. C: out since last season.
+    # D: too few games last season. E: a regular for Atlanta, not yet for Jacksonville. F: one game.
+    assert set(regs) == {("A", "DET"), ("C", "GB"), ("E", "ATL")}
+    assert regs[("C", "GB")]["season"] == 2025
