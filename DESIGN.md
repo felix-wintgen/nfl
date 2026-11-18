@@ -6,13 +6,17 @@ Why the app works the way it does. How to run it is in the [README](README.md). 
 
 All data comes from the `nflverse/nflverse-data` GitHub releases:
 
-| Source                                               | Gives us                                                                                                         |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `pbp/play_by_play_{season}`                          | down, distance, yardline, score, pass/run, air yards, run gap, receiver, EPA, success, win probability           |
-| `pbp_participation/pbp_participation_{season}`       | personnel, formation, box, pass rushers, pressure, coverage and man/zone (2023+), routes; no current-season file |
-| `ftn_charting/ftn_charting_{season}`                 | box, blitzers, rushers, play action, screen, RPO, motion; a game or so behind                                    |
-| `schedules`, `teams`, `weekly_rosters`, `injuries`   | games, lines and listed starting QBs, logos and colors, jersey numbers and roster status, injury reports         |
-| `snap_counts` (this and last season), `depth_charts` | offensive and defensive snap shares; daily depth charts, for the starting QB                                     |
+| Source                                         | Gives us                                                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `pbp/play_by_play_{season}`                    | down, distance, yardline, score, pass/run, air yards, run gap, receiver, EPA, success, win probability           |
+| `pbp_participation/pbp_participation_{season}` | personnel, formation, box, pass rushers, pressure, coverage and man/zone (2023+), routes; no current-season file |
+| `ftn_charting/ftn_charting_{season}`           | box, blitzers, rushers, play action, screen, RPO, motion; a game or so behind                                    |
+| `schedules`                                    | games, lines and listed starting QBs                                                                             |
+| `teams`                                        | names, logos and colors                                                                                          |
+| `weekly_rosters`                               | jersey numbers, positions and roster status (active, injured reserve)                                            |
+| `injuries`                                     | injury reports: game status and practice participation                                                           |
+| `snap_counts` (this and last season)           | offensive and defensive snap shares: who's a regular, who's out by snaps                                         |
+| `depth_charts`                                 | daily depth charts: the third opinion on the starting QB                                                         |
 
 - **We mirror the data.** GitHub release downloads have no CORS headers, so the browser can't read them; the pipeline writes slim per-season parquet files into the site.
 - **No current-season participation.** nflverse publishes it after the season. Personnel, formation and coverage come from last season and are labelled that way; the pipeline picks the file up if it appears.
