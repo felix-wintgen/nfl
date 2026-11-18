@@ -108,13 +108,19 @@ export interface Board {
 	games: number;
 	/** changed: someone else played QB last game; returning: he's back from an injury.
 	 * listed: named only by nflverse's listed starter (no dropbacks yet, zero stats);
-	 * alt: nflverse lists a different starter. */
+	 * alt: another opinion names someone else; why: "listed" (nflverse's listed starter),
+	 * "depth" (QB1 on the depth chart) or "recent" (our pick from recent games, outvoted). */
 	qb:
 		| (Player<QbStats> & {
 				changed: boolean;
 				returning: boolean;
 				listed?: boolean;
-				alt?: { id: string; name: string; jersey: number | null } | null;
+				alt?: {
+					id: string;
+					name: string;
+					jersey: number | null;
+					why?: 'listed' | 'depth' | 'recent';
+				} | null;
 		  })
 		| null;
 	targets: Player<TargetStats>[];

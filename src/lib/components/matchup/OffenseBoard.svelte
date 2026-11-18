@@ -31,6 +31,13 @@
 		backfield: backfieldLine(board)
 	});
 
+	const altWhy = (why?: string) =>
+		why === 'depth'
+			? 'first on the depth chart'
+			: why === 'recent'
+				? 'he played QB in recent games'
+				: 'nflverse lists him to start';
+
 	const isNew = (tag: string, fresh: string[]) =>
 		fresh.includes(tag) ||
 		(tag === 'three_down' && fresh.some((l) => l === 'workhorse' || l === 'passing_down'));
@@ -63,10 +70,10 @@
 				</div>
 				{#each lines.qb as line, i (i)}<p class="line">{line}</p>{/each}
 				{#if q.alt}
-					<p class="line">Or #{q.alt.jersey ?? '–'} {q.alt.name}: nflverse lists him to start.</p>
+					<p class="line">Or #{q.alt.jersey ?? '–'} {q.alt.name}: {altWhy(q.alt.why)}.</p>
 				{/if}
 				{#if q.listed}
-					<p class="facts">Listed starter (nflverse); no dropbacks this season yet.</p>
+					<p class="facts">No dropbacks this season yet.</p>
 				{:else}
 					<p class="facts">
 						{q.stats.completions}/{q.stats.attempts} · {q.stats.pass_yards} yds · {q.stats.pass_td} TD

@@ -456,7 +456,7 @@ def defense_regulars(con: duckdb.DuckDBPyConnection, snaps_file: Path, prev_snap
 def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
           games_file: Path, roster_file: Optional[Path], injuries_file: Optional[Path],
           today: Optional[date] = None, snaps_file: Optional[Path] = None,
-          prev_snaps_file: Optional[Path] = None) -> Optional[Dict]:
+          prev_snaps_file: Optional[Path] = None, depth_file: Optional[Path] = None) -> Optional[Dict]:
     today = today or datetime.now(timezone.utc).date()
     sched = _rows(con, f"SELECT * FROM read_parquet('{games_file}') WHERE season = {season}")
     open_weeks = [g["week"] for g in sched if g["result"] is None and g["home_score"] is None]
@@ -526,6 +526,16 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             WHERE week BETWEEN {week - 3} AND {week - 1} AND report_status = 'Out'""")}
 
     snaps, last_played = snap_shares(con, snaps_file, roster_file, season, week) if snaps_file and roster_file else ({}, {})
+    # Depth-chart QBs per team, in order, from the latest daily snapshot up to today.
+    depth_qbs: Dict[str, List[str]] = defaultdict(list)
+    if depth_file:
+        for r in _rows(con, f"""
+            SELECT team, gsis_id FROM read_parquet('{depth_file}')
+            WHERE pos_abb = 'QB' AND gsis_id IS NOT NULL AND left(dt, 10) <= '{today}'
+            QUALIFY dt = max(dt) OVER (PARTITION BY team)
+            ORDER BY team, pos_rank"""):
+            if r["gsis_id"] not in depth_qbs[r["team"]]:
+                depth_qbs[r["team"]].append(r["gsis_id"])
     regulars = defense_regulars(con, snaps_file, prev_snaps_file, roster_file, season, week) \
         if snaps_file and roster_file else {}
 
@@ -656,23 +666,33 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             starter = last
         else:
             starter = cands[0] if cands else None
-        # nflverse's listed starter is a second opinion: it fills a blank (Week 1, a QB without
-        # dropbacks yet) and is shown next to ours when they differ. Replayed 2022-2026, the two
-        # agree on 91% of boards and are then right 99% of the time; when they differ, each is
-        # right about half the time, so the board names both instead of picking one.
+        # Two more opinions: nflverse's listed starter and the depth chart's QB1, each skipped if
+        # he's unavailable. After the final report the first name is the one two of the three agree
+        # on, else the depth chart's: replayed against the QB who threw the first pass, right
+        # 98.6% (2025) and 98.3% (2026) of the time, ours alone 96.7% and 96.0%. Before the report,
+        # the listing and the depth chart lag behind injuries (a hurt starter stays QB1), so ours
+        # stays first: 94.4% and 93.3%, the vote 90.7% and 90.3%. The other name is shown too.
         if listed and unavailable(listed, team):
             listed = None
-        if not starter and listed:
-            starter = listed
+        depth = next((pid for pid in depth_qbs.get(team, []) if not unavailable(pid, team)), None)
+        ours = starter
+        if team not in pending:
+            votes = [v for v in (ours, listed, depth) if v]
+            starter = next((v for v in votes if votes.count(v) >= 2), None) or depth or ours or listed
+            others = [(ours, "recent"), (listed, "listed"), (depth, "depth")]
+        else:
+            starter = ours or listed or depth
+            others = [(listed, "listed")]
         qb = None
         if starter:
             now, new = labels(team, "qbs", starter)
-            alt = person(listed) if listed and listed != starter else None
+            pick = next(((pid, why) for pid, why in others if pid and pid != starter), None)
+            alt = {**person(pick[0]), "why": pick[1]} if pick else None
             qb = {**person(starter), "stats": qbs.get(starter, NO_QB_STATS), "labels": now, "new": new,
                   "changed": last is not None and starter != last,
                   "returning": last is not None and starter != last and starter in recently_out,
                   "listed": starter not in qbs,
-                  "alt": {k: alt[k] for k in ("id", "name", "jersey")} if alt else None}
+                  "alt": {k: alt[k] for k in ("id", "name", "jersey", "why")} if alt else None}
 
         targets = []
         for pid in sorted(s["targets"], key=lambda p: by_share(s["targets"][p])):

@@ -283,15 +283,16 @@ def build_matchups(con: duckdb.DuckDBPyConnection, season: int, refresh: bool) -
     injuries = download("injuries", f"injuries_{season}.parquet", refresh)
     snaps = download("snap_counts", f"snap_counts_{season}.parquet", refresh)
     prev_snaps = download("snap_counts", f"snap_counts_{season - 1}.parquet", False)  # finished: never changes
+    depth = download("depth_charts", f"depth_charts_{season}.parquet", refresh)
     stale = OUT / "matchups.json"
-    files = {"roster": roster, "injuries": injuries, "snap_counts": snaps}
+    files = {"roster": roster, "injuries": injuries, "snap_counts": snaps, "depth_charts": depth}
     res = None
     if roster is None:  # positions and jersey numbers come from it; the boards would be empty
         stale.unlink(missing_ok=True)
         print(f"  matchups: skipped, no roster file for {season}")
     else:
         res = matchup.build(con, OUT, season, games, roster, injuries, snaps_file=snaps,
-                            prev_snaps_file=prev_snaps)
+                            prev_snaps_file=prev_snaps, depth_file=depth)
         if res is None:
             stale.unlink(missing_ok=True)
             print("  matchups: no upcoming games")
@@ -331,6 +332,8 @@ def data_health(con: duckdb.DuckDBPyConnection, season: int, games: Path, injuri
             "no_injury_report": [t for t in teams if t not in listed],
             "qb_listed_only": sum(bool(b["qb"] and b["qb"].get("listed")) for b in boards),
             "qb_two_names": sum(bool(b["qb"] and b["qb"].get("alt")) for b in boards),
+            # nflverse's listing and the depth chart outvoted our pick
+            "qb_outvoted": sum(bool(b["qb"] and (b["qb"].get("alt") or {}).get("why") == "recent") for b in boards),
             "qb_none": sum(b["qb"] is None for b in boards),
         })
     return health
