@@ -200,6 +200,8 @@
 			<TeamOut board={game.boards.away} team={away} season={data.season} />
 			<TeamOut board={game.boards.home} team={home} season={data.season} />
 		</div>
+		<!-- nflverse's roster has no PFR id for linemen, so their snaps don't join: say so rather than look healthy. -->
+		<p class="fine muted">Offensive linemen aren't covered.</p>
 
 		{#if legend.length}
 			<section class="legend">
