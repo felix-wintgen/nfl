@@ -194,8 +194,20 @@
 		</header>
 
 		<div class="boards">
-			<OffenseBoard board={game.boards.away} team={away} opponent={home} season={data.season} />
-			<OffenseBoard board={game.boards.home} team={home} opponent={away} season={data.season} />
+			<OffenseBoard
+				board={game.boards.away}
+				team={away}
+				opponent={home}
+				defense={game.boards.home.def_out ?? []}
+				season={data.season}
+			/>
+			<OffenseBoard
+				board={game.boards.home}
+				team={home}
+				opponent={away}
+				defense={game.boards.away.def_out ?? []}
+				season={data.season}
+			/>
 		</div>
 
 		{#if legend.length}

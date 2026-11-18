@@ -2,7 +2,16 @@
 // labels (pipeline/matchup.py); this file only words them. Each label has a
 // few variants, picked at random: the wording changes, the facts don't.
 import { ordinal } from './format';
-import type { BackStats, Board, OutPlayer, Person, Player, QbStats, TargetStats } from './matchups';
+import type {
+	BackStats,
+	Board,
+	DefOutPlayer,
+	OutPlayer,
+	Person,
+	Player,
+	QbStats,
+	TargetStats
+} from './matchups';
 
 export type Rng = () => number;
 
@@ -70,7 +79,8 @@ export const ABOUT: Record<string, string> = {
 };
 
 /** "Injured reserve" → "injured_reserve", the key for LABELS and ABOUT. */
-export const statusKey = (status: string) => status.toLowerCase().replaceAll(' ', '_');
+export const statusKey = (status: string) =>
+	status === 'Missed last game' ? 'missed_last' : status.toLowerCase().replaceAll(' ', '_');
 
 /**
  * Health tags next to a name: questionable or doubtful (players ruled out are under
@@ -107,7 +117,7 @@ export function boardTags(b: Board): string[] {
 		person(bk);
 		tags(bk.labels, i === 0 && b.backfield === 'lead').forEach((l) => used.add(l));
 	});
-	for (const o of b.out) used.add(statusKey(o.status));
+	for (const o of [...b.out, ...(b.def_out ?? [])]) used.add(statusKey(o.status));
 	return Object.keys(ABOUT).filter((k) => used.has(k));
 }
 
@@ -311,4 +321,35 @@ export function outLine(o: OutPlayer): string {
 	const what = [role ? `their ${role}` : null, usage].filter(Boolean).join(', ');
 	const next = o.next ? ` Next in line: ${o.next.name} (${p(o.next.share)}).` : '';
 	return `${what}${o.injury ? ` · ${o.injury.toLowerCase()}` : ''}.${next}`;
+}
+
+const MISSING = ['Out', 'Injured reserve', 'Doubtful'];
+
+/** "The Lions defense is without 3 regulars, 1 of them new this week." Empty if nobody is out for sure. */
+export function defenseLine(d: DefOutPlayer[], nick: string): string {
+	const out = d.filter((o) => MISSING.includes(o.status));
+	if (!out.length) return '';
+	const fresh = out.filter((o) => o.new).length;
+	const who = out.length === 1 ? 'one regular' : `${out.length} regulars`;
+	const news = !fresh
+		? ''
+		: out.length === 1
+			? ', new this week'
+			: fresh === out.length
+				? ', all new this week'
+				: `, ${fresh} of them new this week`;
+	return `The ${nick} defense is without ${who}${news}.`;
+}
+
+/** "94% of the defensive snaps · hip · last played Week 8." */
+export function defOutLine(o: DefOutPlayer, season: number): string {
+	const last = o.new
+		? 'played last game'
+		: o.last_played.season < season
+			? `last played in ${o.last_played.season}`
+			: `last played Week ${o.last_played.week}`;
+	return [`${p(o.snap_share)} of the defensive snaps`, o.injury?.toLowerCase(), last]
+		.filter(Boolean)
+		.join(' · ')
+		.concat('.');
 }

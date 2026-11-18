@@ -84,6 +84,16 @@ export interface OutPlayer extends Person {
 	next?: { name: string; share: number };
 }
 
+/** A regular on this team's defense who is out (shown on the other team's board). */
+export interface DefOutPlayer extends Person {
+	status: string;
+	/** Share of the defensive snaps in the games he played (last season's if none this season). */
+	snap_share: number;
+	last_played: { season: number; week: number };
+	/** He played the last game: this just happened. */
+	new: boolean;
+}
+
 export interface Board {
 	team: string;
 	record: string;
@@ -109,6 +119,8 @@ export interface Board {
 	backs: Player<BackStats>[];
 	backfield: 'workhorse' | 'lead' | 'committee';
 	out: OutPlayer[];
+	/** This team's defense: regulars who are out, by usual snap share. */
+	def_out?: DefOutPlayer[];
 	/** The team's final injury report (game statuses) isn't out yet. */
 	report_pending: boolean;
 }

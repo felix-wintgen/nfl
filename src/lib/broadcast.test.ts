@@ -1,8 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/paths', () => ({ asset: (p: string) => p }));
-const { ABOUT, LABELS, backLine, boardTags, healthTags, mainLabel, outLine, targetLine, teamLine } =
-	await import('./broadcast.ts');
+const {
+	ABOUT,
+	LABELS,
+	backLine,
+	boardTags,
+	defenseLine,
+	defOutLine,
+	healthTags,
+	mainLabel,
+	outLine,
+	statusKey,
+	targetLine,
+	teamLine
+} = await import('./broadcast.ts');
 const { favorite, kickoff, nextGame } = await import('./matchups.ts');
 
 const person = {
@@ -125,6 +137,44 @@ describe('lines', () => {
 			labels: []
 		};
 		expect(outLine(o)).toBe('61% of the offensive snaps · knee.');
+	});
+});
+
+describe('their defense', () => {
+	const d = (status: string, isNew: boolean, last = { season: 2026, week: 8 }) => ({
+		...person,
+		pos: 'LB',
+		status,
+		injury: 'Hip',
+		snap_share: 0.94,
+		last_played: last,
+		new: isNew
+	});
+
+	it('counts regulars out for sure, and how many are new', () => {
+		expect(
+			defenseLine([d('Out', true), d('Injured reserve', false), d('Questionable', false)], 'Lions')
+		).toBe('The Lions defense is without 2 regulars, 1 of them new this week.');
+		expect(defenseLine([d('Out', true)], 'Lions')).toBe(
+			'The Lions defense is without one regular, new this week.'
+		);
+		expect(defenseLine([d('Questionable', false)], 'Lions')).toBe('');
+	});
+
+	it('says when he last played', () => {
+		expect(defOutLine(d('Out', false), 2026)).toBe(
+			'94% of the defensive snaps · hip · last played Week 8.'
+		);
+		expect(defOutLine(d('Out', true), 2026)).toBe(
+			'94% of the defensive snaps · hip · played last game.'
+		);
+		expect(defOutLine(d('Injured reserve', false, { season: 2025, week: 15 }), 2026)).toBe(
+			'94% of the defensive snaps · hip · last played in 2025.'
+		);
+	});
+
+	it('explains a missed last game like the offense does', () => {
+		expect(statusKey('Missed last game')).toBe('missed_last');
 	});
 });
 

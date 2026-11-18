@@ -282,6 +282,7 @@ def build_matchups(con: duckdb.DuckDBPyConnection, season: int, refresh: bool) -
     roster = download("weekly_rosters", f"roster_weekly_{season}.parquet", refresh)
     injuries = download("injuries", f"injuries_{season}.parquet", refresh)
     snaps = download("snap_counts", f"snap_counts_{season}.parquet", refresh)
+    prev_snaps = download("snap_counts", f"snap_counts_{season - 1}.parquet", False)  # finished: never changes
     stale = OUT / "matchups.json"
     files = {"roster": roster, "injuries": injuries, "snap_counts": snaps}
     res = None
@@ -289,7 +290,8 @@ def build_matchups(con: duckdb.DuckDBPyConnection, season: int, refresh: bool) -
         stale.unlink(missing_ok=True)
         print(f"  matchups: skipped, no roster file for {season}")
     else:
-        res = matchup.build(con, OUT, season, games, roster, injuries, snaps_file=snaps)
+        res = matchup.build(con, OUT, season, games, roster, injuries, snaps_file=snaps,
+                            prev_snaps_file=prev_snaps)
         if res is None:
             stale.unlink(missing_ok=True)
             print("  matchups: no upcoming games")

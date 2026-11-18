@@ -3,6 +3,8 @@
 	import {
 		backfieldLine,
 		backLine,
+		defenseLine,
+		defOutLine,
 		outLine,
 		qbLine,
 		qbSecondLine,
@@ -12,17 +14,20 @@
 		targetLine,
 		teamLine
 	} from '#lib/broadcast.ts';
-	import type { Board } from '#lib/matchups.ts';
+	import type { Board, DefOutPlayer } from '#lib/matchups.ts';
 	import type { Team } from '#lib/meta.ts';
 	import Tag from './Tag.svelte';
 
-	// One half of the spotting board: when this team has the ball.
+	// One half of the spotting board: when this team has the ball. `defense` is the
+	// opponent's missing defenders: they matter on this team's possessions.
 	let {
 		board,
 		team,
 		opponent,
+		defense,
 		season
-	}: { board: Board; team: Team; opponent: Team; season: number } = $props();
+	}: { board: Board; team: Team; opponent: Team; defense: DefOutPlayer[]; season: number } =
+		$props();
 
 	// Worded once per page load: a reload may phrase things differently, the facts stay put.
 	const lines = $derived({
@@ -30,7 +35,8 @@
 		qb: board.qb ? [qbLine(board.qb), qbSecondLine(board.qb)].filter((l) => l) : [],
 		targets: board.targets.map((t) => targetLine(t)),
 		backs: board.backs.map((b, i) => backLine(b, i === 0 && board.backfield === 'lead')),
-		backfield: backfieldLine(board)
+		backfield: backfieldLine(board),
+		defense: defenseLine(defense, opponent.nick)
 	});
 
 	const isNew = (tag: string, fresh: string[]) =>
@@ -136,6 +142,21 @@
 					<strong>#{o.jersey ?? '–'} {o.name}</strong>
 					<span class="pos">{o.pos}</span>
 					<span class="muted">{outLine(o)}</span>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	{#if defense.length}
+		<h3>{opponent.nick} defense: who's out</h3>
+		{#if lines.defense}<p class="line">{lines.defense}</p>{/if}
+		<ul class="out">
+			{#each defense as o (o.id)}
+				<li>
+					<Tag key={statusKey(o.status)} text={o.status} tone="warn" fresh={o.new} />
+					<strong>#{o.jersey ?? '–'} {o.name}</strong>
+					<span class="pos">{o.pos}</span>
+					<span class="muted">{defOutLine(o, season)}</span>
 				</li>
 			{/each}
 		</ul>

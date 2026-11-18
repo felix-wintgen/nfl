@@ -394,6 +394,13 @@ POSITIONS = ("QB", "RB", "FB", "WR", "TE")
 # shows in touches) a big share of the offensive snaps.
 OUT_TOUCH_BAR = 0.08
 OUT_SNAP_BAR = 0.40
+# The defense's out list (shown on the other team's board) names regulars: half the
+# defensive snaps in the games he played, this season, or last season for the same team
+# if he hasn't played this season (a star out since last year is still news).
+DEF_POSITIONS = ("DL", "LB", "DB")
+DEF_REGULAR_BAR = 0.50
+DEF_LAST_SEASON_GAMES = 4
+OUT_ORDER = {"Out": 0, "Injured reserve": 1, "Doubtful": 2, "Questionable": 3, "Missed last game": 4}
 
 
 def snap_shares(con: duckdb.DuckDBPyConnection, snaps_file: Path, roster_file: Path,
@@ -409,9 +416,37 @@ def snap_shares(con: duckdb.DuckDBPyConnection, snaps_file: Path, roster_file: P
         GROUP BY 1""")}
 
 
+def defense_regulars(con: duckdb.DuckDBPyConnection, snaps_file: Path, prev_snaps_file: Optional[Path],
+                     roster_file: Path, season: int, week: int) -> Dict[str, Dict]:
+    """Defenders who are regulars, by gsis id: share of the defensive snaps in the games
+    he played, the last week he played and his team then. This season's games decide;
+    last season's only for a player without a defensive snap this season."""
+    ids = f"""(SELECT DISTINCT pfr_id, gsis_id FROM read_parquet('{roster_file}')
+               WHERE pfr_id IS NOT NULL AND gsis_id IS NOT NULL)"""
+    now = {r["id"]: {**r, "season": season} for r in _rows(con, f"""
+        SELECT ids.gsis_id AS id, avg(s.defense_pct) AS share, count(*) AS games,
+               max(s.week) AS week, arg_max(s.team, s.week) AS team
+        FROM read_parquet('{snaps_file}') s JOIN {ids} ids ON ids.pfr_id = s.pfr_player_id
+        WHERE s.season = {season} AND s.week < {week} AND s.defense_snaps > 0
+        GROUP BY 1""")}
+    before = {}
+    if prev_snaps_file:
+        before = {r["id"]: {**r, "season": season - 1} for r in _rows(con, f"""
+            SELECT ids.gsis_id AS id, avg(s.defense_pct) AS share, count(*) AS games,
+                   max(s.week) AS week, arg_max(s.team, s.week) AS team
+            FROM read_parquet('{prev_snaps_file}') s JOIN {ids} ids ON ids.pfr_id = s.pfr_player_id
+            WHERE s.season = {season - 1} AND s.game_type = 'REG' AND s.defense_snaps > 0
+            GROUP BY 1""")}
+    regulars = {pid: r for pid, r in now.items() if r["share"] >= DEF_REGULAR_BAR}
+    regulars.update({pid: r for pid, r in before.items() if pid not in now and r["share"] >= DEF_REGULAR_BAR
+                     and r["games"] >= DEF_LAST_SEASON_GAMES})
+    return regulars
+
+
 def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
           games_file: Path, roster_file: Optional[Path], injuries_file: Optional[Path],
-          today: Optional[date] = None, snaps_file: Optional[Path] = None) -> Optional[Dict]:
+          today: Optional[date] = None, snaps_file: Optional[Path] = None,
+          prev_snaps_file: Optional[Path] = None) -> Optional[Dict]:
     today = today or datetime.now(timezone.utc).date()
     sched = _rows(con, f"SELECT * FROM read_parquet('{games_file}') WHERE season = {season}")
     open_weeks = [g["week"] for g in sched if g["result"] is None and g["home_score"] is None]
@@ -431,10 +466,18 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             WHERE week = (SELECT max(week) FROM read_parquet('{roster_file}') WHERE week <= {week})
               AND position IN {POSITIONS}"""):
             roster[r["gsis_id"]] = r
+    defense: Dict[str, Dict] = {}  # defenders, kept apart: the offense's groups and rules never see them
+    if roster_file:
+        for r in _rows(con, f"""
+            SELECT * FROM read_parquet('{roster_file}')
+            WHERE week = (SELECT max(week) FROM read_parquet('{roster_file}') WHERE week <= {week})
+              AND position IN {DEF_POSITIONS}"""):
+            defense[r["gsis_id"]] = r
     positions = {pid: r["position"] for pid, r in roster.items()}
     # Players no longer on a roster keep their pbp position guess: none, so they drop out of groups.
 
     injuries: Dict[str, Dict] = {}  # this week's game statuses
+    def_report: Dict[str, Dict] = {}  # the same, for defenders
     listed: Dict[str, Dict] = {}    # everyone on this week's report, with or without one
     missed: Set[Tuple[str, int]] = set()  # (id, week): ruled out, or inactive on game day
     if injuries_file:
@@ -447,11 +490,15 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         missed = {(r["gsis_id"], r["week"]) for r in _rows(con, f"""
             SELECT gsis_id, week FROM read_parquet('{injuries_file}')
             WHERE report_status IN {OUT_STATUSES} AND {NOT_RESTING}""")}
+        # The report's defensive positions are finer (CB, S, DE …): match by roster instead.
+        def_report = {r["gsis_id"]: r for r in _rows(con, f"""
+            SELECT * FROM read_parquet('{injuries_file}')
+            WHERE week = {week} AND report_status IS NOT NULL""") if r["gsis_id"] in defense}
     if roster_file:
         missed |= {(r["gsis_id"], r["week"]) for r in _rows(con, f"""
             SELECT gsis_id, week FROM read_parquet('{roster_file}') WHERE status = 'INA'""")}
     # Until a team's final report is out, the board shows last game and practice instead.
-    with_status = {r["team"] for r in injuries.values()}
+    with_status = {r["team"] for r in [*injuries.values(), *def_report.values()]}
     gameday = {t: date.fromisoformat(str(g["gameday"])) for g in games for t in (g["home_team"], g["away_team"])}
     pending = {t for t, d in gameday.items() if report_pending(t in with_status, d, today)}
     last_week = {t: max((g["week"] for g in sched if g["week"] < week and t in (g["home_team"], g["away_team"])), default=None)
@@ -459,6 +506,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
     # Once a game is played, "questionable" and "doubtful" are answered: keep only who was ruled out.
     done = {t for g in games if g["home_score"] is not None for t in (g["home_team"], g["away_team"])}
     injuries = {pid: r for pid, r in injuries.items() if r["team"] not in done or r["report_status"] == "Out"}
+    def_report = {pid: r for pid, r in def_report.items() if r["team"] not in done or r["report_status"] == "Out"}
 
     # Ruled out in one of the last three weeks: a QB coming back from that gets his job back.
     recently_out = set()
@@ -468,6 +516,8 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             WHERE week BETWEEN {week - 3} AND {week - 1} AND report_status = 'Out'""")}
 
     snaps = snap_shares(con, snaps_file, roster_file, season, week) if snaps_file and roster_file else {}
+    regulars = defense_regulars(con, snaps_file, prev_snaps_file, roster_file, season, week) \
+        if snaps_file and roster_file else {}
 
     u = usage(con, files, season, week)
     stats = player_stats(u, positions, availability(con, roster_file, injuries_file) if roster_file else None)
@@ -534,7 +584,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
     ppg_rank = {t: 1 + sum(v > ppg[t] for v in ppg.values()) for t in ppg}
 
     def person(pid: str, short: Optional[str] = None) -> Dict:
-        r = roster.get(pid, {})
+        r = roster.get(pid) or defense.get(pid, {})
         inj = injuries.get(pid)
         rep = listed.get(pid) or {}
         team = r.get("team")
@@ -663,15 +713,38 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
                 elif b and "workhorse" in item["labels"] and backs:
                     item["next"] = {"name": backs[0]["name"], "share": backs[0]["stats"]["rb_share"]}
             out.append(item)
-        order = {"Out": 0, "Injured reserve": 1, "Doubtful": 2, "Questionable": 3}
-        out.sort(key=lambda i: (order.get(i["status"], 4), -(i["target_share"] or i["carry_share"] or 0)))
+        # By impact, not status: the QB first, then usual share of the snaps.
+        out.sort(key=lambda i: ((i["dropbacks"] or 0) < 30, -(snaps.get(i["id"]) or 0), OUT_ORDER.get(i["status"], 9)))
+
+        # This team's defense: its regulars who are out, by usual snap share. Shown on the
+        # other team's board, where they matter. "New": he played the last game.
+        def_out = []
+        for pid, reg in regulars.items():
+            r = defense.get(pid)
+            if not r or r.get("team") != team or (reg["season"] < season and reg["team"] != team):
+                continue
+            rep = def_report.get(pid)
+            if rep:
+                status = rep["report_status"]
+            elif r.get("status") == "RES":
+                status = "Injured reserve"
+            elif team in pending and (pid, last_week.get(team)) in missed:
+                status = "Missed last game"
+            else:
+                continue
+            played_last = reg["season"] == season and reg["week"] == last_week.get(team)
+            def_out.append({**person(pid), "pos": r.get("depth_chart_position") or r.get("position"),  # CB, not DB
+                            "status": status, "injury": (rep or {}).get("report_primary_injury"),
+                            "snap_share": reg["share"], "last_played": {"season": reg["season"], "week": reg["week"]},
+                            "new": played_last and status in ("Out", "Doubtful", "Injured reserve")})
+        def_out.sort(key=lambda i: (-i["snap_share"], OUT_ORDER.get(i["status"], 9)))
 
         return {
             "team": team, "record": rec, "ppg": round(pts, 1), "ppg_rank": ppg_rank.get(team),
             "epa_rank": ctx.get("epa_rank"), "early_pass": ctx.get("early_pass"),
             "early_pass_rank": ctx.get("early_pass_rank"), "teams": ctx.get("teams"),
             "games": len([g for g in played if team in (g["home_team"], g["away_team"])]),
-            "qb": qb, "targets": targets, "backs": backs, "backfield": backfield, "out": out,
+            "qb": qb, "targets": targets, "backs": backs, "backfield": backfield, "out": out, "def_out": def_out,
             "report_pending": team in pending,
         }
 
