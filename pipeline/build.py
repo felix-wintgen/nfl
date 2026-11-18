@@ -316,11 +316,25 @@ def data_health(con: duckdb.DuckDBPyConnection, season: int, games: Path, injuri
         WHERE season = {season} AND home_score IS NOT NULL
           AND game_id NOT IN (SELECT DISTINCT game_id FROM read_parquet('{plays}'))
         ORDER BY game_id""").fetchall()] if plays.exists() else []
+    # Regulars whose snap counts don't join to a roster player (PFR id missing): invisible to
+    # Who's out. Offensive linemen and long snappers never have the id; they aren't shown anyway.
+    unmatched = []
+    if files.get("snap_counts") and files.get("roster"):
+        unmatched = [f"{r[0]} {r[1]} ({r[2]})" for r in con.execute(f"""
+            WITH ids AS (SELECT DISTINCT pfr_id FROM read_parquet('{files["roster"]}') WHERE pfr_id IS NOT NULL)
+            SELECT team, player, position FROM read_parquet('{files["snap_counts"]}')
+            WHERE season = {season} AND position NOT IN ('T', 'G', 'C', 'OL', 'LS')
+              AND (offense_snaps > 0 OR defense_snaps > 0)
+              AND pfr_player_id NOT IN (SELECT pfr_id FROM ids)
+            GROUP BY ALL
+            HAVING avg(greatest(offense_pct, defense_pct)) >= 0.5 AND count(*) >= 2
+            ORDER BY team, player""").fetchall()]
     health = {
         "trigger": os.environ.get("GITHUB_EVENT_NAME", "local"),
         "missing": [name for name, path in files.items() if path is None],
         # Games the schedule has as played whose plays aren't in the play-by-play yet.
         "plays_lagging": lagging,
+        "regulars_unmatched": unmatched,
     }
     if res:
         teams = sorted({g[s] for g in res["games"] for s in ("away", "home")})

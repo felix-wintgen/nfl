@@ -138,6 +138,22 @@ describe('lines', () => {
 		};
 		expect(outLine(o)).toBe('61% of the offensive snaps · knee.');
 	});
+
+	it("says when his share is last season's", () => {
+		const o = {
+			...person,
+			status: 'Injured reserve',
+			injury: null,
+			target_share: null,
+			carry_share: null,
+			dropbacks: null,
+			snap_share: 0.78,
+			by_snaps: false,
+			last_season: true,
+			labels: []
+		};
+		expect(outLine(o)).toBe('78% of the offensive snaps last season.');
+	});
 });
 
 describe('who is out', () => {

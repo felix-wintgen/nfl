@@ -20,7 +20,7 @@ All data comes from the `nflverse/nflverse-data` GitHub releases:
 
 - **We mirror it.** GitHub release downloads have no CORS headers, so the browser can't read them; the pipeline writes slim parquet and JSON files into the site.
 - **When nflverse updates.** Play-by-play after each game window (the last at 00:30 Eastern, after the night game) and daily at 05:00 Eastern in season. Injury reports, rosters and depth charts more than once a day, early morning and afternoon UTC. Next week's lines go briefly blank after Monday night (Tuesday 03:30–06:45 UTC in 2025). nflverse is a volunteer project with no SLA.
-- **Gaps we've seen.** The schedule's starting-QB columns stay the pre-game listing after the game (57 games 2022–2026 list a QB who didn't start). The depth chart is slow on injuries: a hurt starter stays QB1 for days (Maye, Nov 2026). Weather and referee are filled in only after a game. A new playoff round's rows arrive over about 12 hours. Participation (personnel, formation, coverage, routes, pressure) comes only after the season; coverage and targeted route exist only on dropbacks (~99% from 2023, ~89% in 2022).
+- **Gaps we've seen.** The schedule's starting-QB columns stay the pre-game listing after the game (57 games 2022–2026 list a QB who didn't start). The depth chart is slow on injuries: a hurt starter stays QB1 for days (Maye, Nov 2026). Weather and referee are filled in only after a game. A new playoff round's rows arrive over about 12 hours. The roster has no Pro Football Reference id for offensive linemen and long snappers, so their snap counts don't join to them. Participation (personnel, formation, coverage, routes, pressure) comes only after the season; coverage and targeted route exist only on dropbacks (~99% from 2023, ~89% in 2022).
 
 ## Architecture
 
@@ -43,7 +43,7 @@ Browser
 - **No server.** Queries run in the visitor's browser, so the build costs the same for one user or many. Finished seasons' play files (play-by-play, participation, FTN) are cached between builds.
 - **Derived columns** (personnel grouping, defensive package, distance bucket, field zone, score state …) are DuckDB macros in `pipeline/derive.py`, computed once so the frontend SQL stays simple.
 - **Build timing.** 08:50 UTC: after the night play-by-play and the Tuesday odds gap, before the winter 05:00 Eastern re-pull (10:00 UTC), and away from the top of the hour, where GitHub delays scheduled runs most. GitHub can still start it hours late or skip a day, and pushes rebuild too; the corner of every page shows when the data was built. A failed sanity check stops the deploy and the last good site stays up.
-- **Data-health record.** Each build logs, also into `manifest.json`: what triggered it, missing files, played games whose plays aren't in yet, teams without an injury report, and how the QB was picked (two names, no dropbacks yet, none, outvoted by the listing and the depth chart). It changes nothing on the board; it's the record for deciding which nflverse gap needs handling.
+- **Data-health record.** Each build logs, also into `manifest.json`: what triggered it, missing files, played games whose plays aren't in yet, regulars whose snap counts don't join (outside the line, normally none), teams without an injury report, and how the QB was picked (two names, no dropbacks yet, none, outvoted by the listing and the depth chart). It changes nothing on the board; it's the record for deciding which nflverse gap needs handling.
 
 ## Game day
 
@@ -78,7 +78,7 @@ The numbers rebuild each source as the 08:50 UTC build would have seen it: the l
 
 **Per team, below both boards**, offense and defense together under the team's color: viewers think in teams, not possessions.
 
-- **Offense:** players with 8%+ of the targets or carries, or 40%+ of the offensive snaps (blocking tight ends barely show in touches).
+- **Offense:** players with 8%+ of the targets or carries, or 40%+ of the offensive snaps (blocking tight ends barely show in touches). Without a snap this season, a regular for this team last season (half the snaps, four games) still shows, as on defense.
 - **Defense:** regulars, at half the defensive snaps in the games they played for this team, over two games (one if the team has played only one). Without a snap this season, last season's share with the same team counts, so a star out since last year (Parsons) still shows; a defender traded in isn't a regular until he's played for his new team.
 - **Ordered by impact:** the QB first, then usual snap share. Snap share underrates part-time stars (a lead back, an edge rusher), but position weights would be our guess.
 - **Statuses:** out, injured reserve, doubtful, questionable; before the final report, "Missed last game". "New" marks a player who played the last game. The count line counts out, injured reserve and doubtful; the rest are "in doubt".

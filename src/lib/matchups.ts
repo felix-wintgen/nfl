@@ -80,6 +80,8 @@ export interface OutPlayer extends Person {
 	snap_share?: number | null;
 	/** Listed for his snaps alone (a blocker), not for targets or carries. */
 	by_snaps?: boolean;
+	/** No snap this season: listed as a regular for this team last season (snap_share is last season's). */
+	last_season?: boolean;
 	labels: string[];
 	next?: { name: string; share: number };
 	/** He played the last game: this just happened. */

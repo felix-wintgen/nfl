@@ -395,12 +395,11 @@ POSITIONS = ("QB", "RB", "FB", "WR", "TE")
 # shows in touches) a big share of the offensive snaps.
 OUT_TOUCH_BAR = 0.08
 OUT_SNAP_BAR = 0.40
-# The defense's out list (shown on the other team's board) names regulars: half the
-# defensive snaps in the games he played, this season, or last season for the same team
-# if he hasn't played this season (a star out since last year is still news).
+# A regular has half his unit's snaps in the games he played: this season, or last season
+# for the same team if he hasn't played this season (a star out since last year is still news).
 DEF_POSITIONS = ("DL", "LB", "DB")
-DEF_REGULAR_BAR = 0.50
-DEF_LAST_SEASON_GAMES = 4
+REGULAR_BAR = 0.50
+LAST_SEASON_GAMES = 4
 # Out for sure: what the team's count counts, and what can be "new".
 MISSING = ("Out", "Injured reserve", "Doubtful")
 OUT_ORDER = {"Out": 0, "Injured reserve": 1, "Doubtful": 2, "Questionable": 3, "Missed last game": 4}
@@ -445,12 +444,12 @@ def defense_regulars(con: duckdb.DuckDBPyConnection, snaps_file: Path, prev_snap
     now = per_team(snaps_file, season, f"AND s.week < {week}")
     played_now = {r["id"] for r in now}
     regulars = {(r["id"], r["team"]): {**r, "season": season} for r in now
-                if r["share"] >= DEF_REGULAR_BAR and r["games"] >= min(2, team_games.get(r["team"], 0))}
+                if r["share"] >= REGULAR_BAR and r["games"] >= min(2, team_games.get(r["team"], 0))}
     if prev_snaps_file:
         regulars.update({(r["id"], r["team"]): {**r, "season": season - 1}
                          for r in per_team(prev_snaps_file, season - 1, "AND s.game_type = 'REG'")
-                         if r["id"] not in played_now and r["share"] >= DEF_REGULAR_BAR
-                         and r["games"] >= DEF_LAST_SEASON_GAMES})
+                         if r["id"] not in played_now and r["share"] >= REGULAR_BAR
+                         and r["games"] >= LAST_SEASON_GAMES})
     return regulars
 
 
@@ -477,12 +476,33 @@ def _status(inj: Optional[Dict]) -> str:
     return inj["report_status"] if inj else "Injured reserve"
 
 
+def offense_last_season(con: duckdb.DuckDBPyConnection, snaps_file: Path, prev_snaps_file: Optional[Path],
+                        roster_file: Path, season: int, week: int) -> Dict[Tuple[str, str], float]:
+    """Offensive regulars of last season, by (gsis id, team), who haven't played on offense this
+    season: their share of the offensive snaps for that team (James Conner, Arizona 2026)."""
+    if not prev_snaps_file:
+        return {}
+    ids = f"""(SELECT DISTINCT pfr_id, gsis_id FROM read_parquet('{roster_file}')
+               WHERE pfr_id IS NOT NULL AND gsis_id IS NOT NULL)"""
+    return {(r["id"], r["team"]): r["share"] for r in _rows(con, f"""
+        SELECT ids.gsis_id AS id, s.team, avg(s.offense_pct) AS share, count(*) AS games
+        FROM read_parquet('{prev_snaps_file}') s JOIN {ids} ids ON ids.pfr_id = s.pfr_player_id
+        WHERE s.season = {season - 1} AND s.game_type = 'REG' AND s.offense_snaps > 0
+          AND ids.gsis_id NOT IN (
+              SELECT ids.gsis_id FROM read_parquet('{snaps_file}') s JOIN {ids} ids ON ids.pfr_id = s.pfr_player_id
+              WHERE s.season = {season} AND s.week < {week} AND s.offense_snaps > 0)
+        GROUP BY ALL
+        HAVING avg(s.offense_pct) >= {REGULAR_BAR} AND count(*) >= {LAST_SEASON_GAMES}""")}
+
+
 def offense_out(team: str, candidates: Set[str], roster: Dict[str, Dict], injuries: Dict[str, Dict],
                 s: Dict, snaps: Dict[str, float], last_played: Dict[str, int], last_wk: Optional[int],
-                held: Dict, targets: List[Dict], backs: List[Dict], person: Callable[[str], Dict]) -> List[Dict]:
+                held: Dict, targets: List[Dict], backs: List[Dict], person: Callable[[str], Dict],
+                last_season: Optional[Dict[Tuple[str, str], float]] = None) -> List[Dict]:
     """The offense's players who are out and mattered: a real share of the targets or carries,
-    a QB's dropbacks, or a big share of the snaps (blockers). By impact: the QB first, then usual
-    snap share. "New": he played the last game."""
+    a QB's dropbacks, a big share of the snaps (blockers), or, without a snap this season, a
+    regular for this team last season. By impact: the QB first, then usual snap share.
+    "New": he played the last game."""
     out = []
     for pid in candidates:
         r = roster.get(pid) or {}
@@ -494,12 +514,13 @@ def offense_out(team: str, candidates: Set[str], roster: Dict[str, Dict], injuri
         snap = snaps.get(pid, 0.0)
         qb_role = bool(q and q["dropbacks"] >= 30)
         by_snaps = not qb_role and share < OUT_TOUCH_BAR and snap >= OUT_SNAP_BAR
-        if not qb_role and share < OUT_TOUCH_BAR and not by_snaps:
+        before = (last_season or {}).get((pid, team)) if pid not in snaps else None
+        if not qb_role and share < OUT_TOUCH_BAR and not by_snaps and before is None:
             continue
         item = {**person(pid), "status": _status(inj),
                 "target_share": t["share"] if t else None, "carry_share": b["rb_share"] if b else None,
                 "dropbacks": q["dropbacks"] if q else None,
-                "snap_share": snap or None, "by_snaps": by_snaps,
+                "snap_share": snap or before or None, "by_snaps": by_snaps, "last_season": before is not None,
                 "new": last_played.get(pid) == last_wk and _status(inj) in MISSING,
                 "labels": [l for g in ("qbs", "targets", "backs") for l in held.get((team, g, pid), [])]}
         # Who's next in line for an absent go-to guy or workhorse.
@@ -509,7 +530,7 @@ def offense_out(team: str, candidates: Set[str], roster: Dict[str, Dict], injuri
             elif b and "workhorse" in item["labels"] and backs:
                 item["next"] = {"name": backs[0]["name"], "share": backs[0]["stats"]["rb_share"]}
         out.append(item)
-    out.sort(key=lambda i: ((i["dropbacks"] or 0) < 30, -(snaps.get(i["id"]) or 0), OUT_ORDER.get(i["status"], 9), i["id"]))
+    out.sort(key=lambda i: ((i["dropbacks"] or 0) < 30, -(i["snap_share"] or 0), OUT_ORDER.get(i["status"], 9), i["id"]))
     return out
 
 
@@ -625,6 +646,8 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             if r["gsis_id"] not in depth_qbs[r["team"]]:
                 depth_qbs[r["team"]].append(r["gsis_id"])
     regulars = defense_regulars(con, snaps_file, prev_snaps_file, roster_file, season, week) \
+        if snaps_file and roster_file else {}
+    off_last_season = offense_last_season(con, snaps_file, prev_snaps_file, roster_file, season, week) \
         if snaps_file and roster_file else {}
 
     u = usage(con, files, season, week)
@@ -797,7 +820,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         # Who's out, offense and defense (shown per team, below the boards).
         candidates = set(injuries) | {p for p, r in roster.items() if r.get("status") == "RES"}
         out = offense_out(team, candidates, roster, injuries, s, snaps, last_played, last_week.get(team),
-                          held, targets, backs, person)
+                          held, targets, backs, person, off_last_season)
         def_out = defense_out(team, season, regulars, defense, def_report, team in pending, missed,
                               last_week.get(team), person)
 

@@ -250,3 +250,14 @@ def test_offense_out_who_matters_and_order():
     wr1, te2 = out[1], out[2]
     assert wr1["new"] and wr1["next"] == {"name": "Odunze", "share": 0.18}
     assert te2["by_snaps"] and not te2["new"]
+
+
+def test_offense_out_falls_back_to_last_season():
+    s = {"targets": {}, "backs": {}, "qbs": {}}
+    roster = {"rb": {"team": "ARI", "status": "RES"}, "wr": {"team": "ARI", "status": "RES"}}
+    # rb: a regular for Arizona last season, no snap this season. wr: same, but for another team.
+    last = {("rb", "ARI"): 0.5, ("wr", "HOU"): 0.6}
+    out = offense_out("ARI", {"rb", "wr"}, roster, {}, s, {}, {}, 10, {}, [], [], person, last)
+    assert [(o["id"], o["status"], o["snap_share"], o["last_season"]) for o in out] == [("rb", "Injured reserve", 0.5, True)]
+    # A snap this season means this season decides: no fallback.
+    assert offense_out("ARI", {"rb"}, roster, {}, s, {"rb": 0.1}, {}, 10, {}, [], [], person, last) == []
