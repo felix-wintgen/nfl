@@ -52,10 +52,12 @@
 <div class="asof">
 	{#if asOf}
 		Data through {asOf.latest.season}
-		{weekLabel(asOf.latest.last_week)} · updated {asOf.builtAt.toLocaleDateString(undefined, {
+		{weekLabel(asOf.latest.last_week)} · updated {asOf.builtAt.toLocaleString(undefined, {
+			weekday: 'short',
 			month: 'short',
 			day: 'numeric',
-			year: 'numeric'
+			hour: '2-digit',
+			minute: '2-digit'
 		})}
 	{/if}
 </div>

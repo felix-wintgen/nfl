@@ -39,7 +39,6 @@
 	const teamOf = (abbr: string): Team =>
 		meta?.teams.find((t) => t.abbr === abbr) ??
 		({ abbr, name: abbr, nick: abbr, color: '#888', color2: '#888', logo: '' } as Team);
-	const builtAt = $derived(meta ? new Date(meta.manifest.built_at) : null);
 	// The tags on this game's boards, for the legend.
 	const legend = $derived.by(() => {
 		if (!game) return [];
@@ -177,10 +176,8 @@
 				{/if}
 			</dl>
 			<p class="fine muted">
-				Lines from nflverse as of {builtAt?.toLocaleDateString(undefined, {
-					month: 'short',
-					day: 'numeric'
-				})}; they move during the week. Head coaches: {game.away_coach ?? '–'} ({away.abbr}),
+				Lines from nflverse at build time; they move during the week. Head coaches: {game.away_coach ??
+					'–'} ({away.abbr}),
 				{game.home_coach ?? '–'} ({home.abbr}).
 			</p>
 			<!-- Labels need a few games of usage; say so rather than guess from last season. -->
