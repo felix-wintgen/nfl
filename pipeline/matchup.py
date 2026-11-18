@@ -1,7 +1,8 @@
 """Game-day "spotting board" data for the upcoming week.
 
 For every game of the next unfinished week: the line, both offenses' QB,
-top targets and backfield with role labels, and who's out. Writes
+top targets and backfield with role labels, and each team's missing players,
+offense and defense. Writes
 static/data/matchups.json; the matchup page turns labels into broadcast lines.
 
 Labels rest on usage (targets, air yards, carries), which carries over from
@@ -381,7 +382,7 @@ def practice(status: Optional[str]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 OUT_STATUSES = ("Out", "Doubtful")
-# A QB named only by nflverse's listed starter: no dropbacks this season yet.
+# A QB named only by nflverse's listing or the depth chart: no dropbacks this season yet.
 NO_QB_STATS = {k: 0 for k in ("dropbacks", "attempts", "completions", "pass_yards", "pass_td", "ints", "sacks",
                               "adot", "deep_rate", "sack_rate", "int_rate", "run_rate", "rush_yards", "rush_ypg",
                               "rush_td", "games")}

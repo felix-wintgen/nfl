@@ -15,9 +15,9 @@ npm run dev
 
 ## Data pipeline
 
-`pipeline/build.py` downloads play-by-play, NGS participation and FTN charting from the nflverse-data releases. It caches them in `pipeline/.cache`, joins them per play, and writes one slim `static/data/plays_{season}.parquet` per season, plus `fourth_{season}.parquet` with every 4th down including punts and field goals (for go-for-it rates). It also writes `teams.json`, `games.json`, `matchups.json` and `manifest.json`. Each build prints a data-health record, also stored in `manifest.json`: what triggered the build, missing nflverse files, played games whose plays aren't in yet, teams without an injury report, and how often Game day leaned on nflverse's listed QB. Look there first when a board looks off.
+`pipeline/build.py` downloads play-by-play, NGS participation and FTN charting from the nflverse-data releases, plus what Game day needs: schedules, rosters, injury reports, snap counts (this season's and last season's) and depth charts. It caches them in `pipeline/.cache`, joins the play files per play, and writes one slim `static/data/plays_{season}.parquet` per season, plus `fourth_{season}.parquet` with every 4th down including punts and field goals (for go-for-it rates). It also writes `teams.json`, `games.json`, `matchups.json` and `manifest.json`. Each build prints a data-health record, also stored in `manifest.json`: what triggered the build, missing nflverse files, played games whose plays aren't in yet, teams without an injury report, and how the QB was picked (boards with two names, with a QB who has no dropbacks yet, with none, and where nflverse's listing and the depth chart outvoted our rule). Look there first when a board looks off.
 
-The derived columns (personnel grouping, defensive package, distance bucket, field zone …) are DuckDB macros in `pipeline/derive.py`, tested in `pipeline/tests/` (`npm run data:test`).
+The derived columns (personnel grouping, defensive package, distance bucket, field zone …) are DuckDB macros in `pipeline/derive.py`. The pipeline's tests are in `pipeline/tests/` (`npm run data:test`); the app's are run with `npm test`, its types and Svelte checks with `npm run check`.
 
 The build exits non-zero when a sanity check fails (low join rates, too few plays for a full season).
 
@@ -27,14 +27,15 @@ Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-dow
 
 ## Game day
 
-`/matchup` is a spotting board for the upcoming week, for someone who tunes in with seconds to spare. Per game: the line with the implied score and win probability (from the moneylines, bookmaker's margin removed), regular-season records, and for each offense:
+`/matchup` is a spotting board for the upcoming week, for someone who tunes in with seconds to spare. Per game: the line with the implied score and win probability (from the moneylines, bookmaker's margin removed), regular-season records, then a board for each offense:
 
-- **The starting QB**: last game's starter, unless a former starter is back from being ruled out. When nflverse lists someone else to start, the board names both.
+- **The starting QB.** Three opinions: our rule (last game's starter, unless a former starter is back from being ruled out), nflverse's listed starter, and QB1 on nflverse's depth chart. After the final injury report the board names the one two of them agree on; before it, ours. A dissenting name is shown second, with where it comes from.
 - **Four targets** by share of the targets in the games they were active for, and the **backfield** by carries.
 - **Role labels** ("go-to guy", "workhorse", "turnover watch" …). They're sticky: earned at one bar, kept until clearly below a lower one.
-- **Who's out** per team, below the boards: missing offensive players and defensive regulars, ordered by impact, with who's new this week. Until a team's final injury report is out, players show whether they missed the last game and how they practiced instead.
 
-`pipeline/matchup.py` writes `static/data/matchups.json` from this season's play-by-play plus nflverse schedules, rosters, injury reports and snap counts; `src/lib/broadcast.ts` words it, with a few random variants per label. The board runs from the season opener through the Super Bowl; before the opener there's no current-season play-by-play, so there's no board. Why the rules are what they are, with the replays behind them: [DESIGN.md](DESIGN.md#game-day).
+Below the boards, **who's out** for each team: missing offensive players and defensive regulars, ordered by impact, with who's new this week and a count. Until a team's final injury report is out, players show whether they missed the last game and how they practiced instead.
+
+`pipeline/matchup.py` writes `static/data/matchups.json` from this season's play-by-play plus nflverse schedules, rosters, injury reports, snap counts and depth charts; `src/lib/broadcast.ts` words it, with a few random variants per label. The board runs from the season opener through the Super Bowl; before the opener there's no current-season play-by-play, so there's no board. Why the rules are what they are, with the replays behind them: [DESIGN.md](DESIGN.md#game-day).
 
 ## Known data gaps
 

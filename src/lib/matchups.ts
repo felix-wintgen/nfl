@@ -107,7 +107,7 @@ export interface Board {
 	teams: number | null;
 	games: number;
 	/** changed: someone else played QB last game; returning: he's back from an injury.
-	 * listed: named only by nflverse's listed starter (no dropbacks yet, zero stats);
+	 * listed: no dropbacks this season yet (named by nflverse's listing or depth chart; zero stats);
 	 * alt: another opinion names someone else; why: "listed" (nflverse's listed starter),
 	 * "depth" (QB1 on the depth chart) or "recent" (our pick from recent games, outvoted). */
 	qb:

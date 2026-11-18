@@ -1,7 +1,9 @@
 """Build the slim scouting dataset served by the static site.
 
 Downloads nflverse play-by-play, participation and FTN charting files, joins
-them per play, derives scouting columns (see derive.py) and writes:
+them per play, derives scouting columns (see derive.py), builds the game-day
+board from schedules, rosters, injuries, snap counts and depth charts
+(see matchup.py) and writes:
 
     static/data/plays_{season}.parquet
     static/data/fourth_{season}.parquet   (every 4th down incl. punts/FGs)
