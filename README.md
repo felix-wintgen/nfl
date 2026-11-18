@@ -15,7 +15,7 @@ npm run dev
 
 ## Data pipeline
 
-`pipeline/build.py` downloads play-by-play, NGS participation and FTN charting from the nflverse-data releases, plus what Game day needs: schedules, rosters, injury reports, snap counts (this season's and last season's) and depth charts. It caches them in `pipeline/.cache`, joins the play files per play, and writes one slim `static/data/plays_{season}.parquet` per season, plus `fourth_{season}.parquet` with every 4th down including punts and field goals (for go-for-it rates). It also writes `teams.json`, `games.json`, `matchups.json` and `manifest.json`. Each build prints a data-health record, also stored in `manifest.json`: what triggered the build, missing nflverse files, played games whose plays aren't in yet, teams without an injury report, and how the QB was picked (boards with two names, with a QB who has no dropbacks yet, with none, and where nflverse's listing and the depth chart outvoted our rule). Look there first when a board looks off.
+`pipeline/build.py` downloads nflverse's play-by-play, NGS participation and FTN charting, plus schedules, rosters, injury reports, snap counts and depth charts for Game day, and caches them in `pipeline/.cache`. It writes `static/data/plays_{season}.parquet` and `fourth_{season}.parquet` (every 4th down, for go-for-it rates) per season, plus `teams.json`, `games.json`, `matchups.json` and `manifest.json`. When a board looks off, look first at the data-health record in `manifest.json` ([DESIGN.md](DESIGN.md#architecture)).
 
 The derived columns (personnel grouping, defensive package, distance bucket, field zone …) are DuckDB macros in `pipeline/derive.py`. The pipeline's tests are in `pipeline/tests/` (`npm run data:test`); the app's are run with `npm test`, its types and Svelte checks with `npm run check`.
 
@@ -27,20 +27,7 @@ Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-dow
 
 ## Game day
 
-`/matchup` is a spotting board for the upcoming week, for someone who tunes in with seconds to spare. Per game: the line with the implied score and win probability (from the moneylines, bookmaker's margin removed), regular-season records, then a board for each offense:
-
-- **The starting QB.** Three opinions: our rule (last game's starter, unless a former starter is back from being ruled out), nflverse's listed starter, and QB1 on nflverse's depth chart. After the final injury report the board names the one two of them agree on; before it, ours. A dissenting name is shown second, with where it comes from.
-- **Four targets** by share of the targets in the games they were active for, and the **backfield** by carries.
-- **Role labels** ("go-to guy", "workhorse", "turnover watch" …). They're sticky: earned at one bar, kept until clearly below a lower one.
-
-Below the boards, **who's out** for each team: missing offensive players and defensive regulars, ordered by impact, with who's new this week and a count. Until a team's final injury report is out, players show whether they missed the last game and how they practiced instead.
-
-`pipeline/matchup.py` writes `static/data/matchups.json` from this season's play-by-play plus nflverse schedules, rosters, injury reports, snap counts and depth charts; `src/lib/broadcast.ts` words it, with a few random variants per label. The board runs from the season opener through the Super Bowl; before the opener there's no current-season play-by-play, so there's no board. Why the rules are what they are, with the replays behind them: [DESIGN.md](DESIGN.md#game-day).
-
-## Known data gaps
-
-- NGS participation (personnel, formation, coverage, routes, pressure) is not published for the current season yet; those columns are NULL for 2026.
-- Coverage and targeted route exist only for dropbacks (~99% of them from 2023 on, ~89% in 2022).
+`/matchup` is a spotting board for the coming week. Per game: the line, implied score and win chance, and records; for each offense, the starting QB, four targets, the backfield and role labels; below them, who's out for each team. `pipeline/matchup.py` builds `matchups.json`, `src/lib/broadcast.ts` words it. There's no board before the season opener. The rules and the replays behind them: [DESIGN.md](DESIGN.md#game-day).
 
 ## Deployment
 

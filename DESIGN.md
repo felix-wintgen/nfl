@@ -1,6 +1,6 @@
 # NFL Scout: design notes
 
-Why the app works the way it does. How to run it is in the [README](README.md). The app is a snapshot of the current week built on nflverse data, not an archive: no history and no past-week boards.
+Why the app works the way it does; how to run it is in the [README](README.md). Game day is a snapshot of the coming week, with no past-week boards; the DC and OC helpers query every season since 2022.
 
 ## Data
 
@@ -18,41 +18,32 @@ All data comes from the `nflverse/nflverse-data` GitHub releases:
 | `snap_counts` (this and last season)           | offensive and defensive snap shares: who's a regular, who's out by snaps                                         |
 | `depth_charts`                                 | daily depth charts: the third opinion on the starting QB                                                         |
 
-- **We mirror the data.** GitHub release downloads have no CORS headers, so the browser can't read them; the pipeline writes slim per-season parquet files into the site.
-- **No current-season participation.** nflverse publishes it after the season. Personnel, formation and coverage come from last season and are labelled that way; the pipeline picks the file up if it appears.
-- **nflverse timing.** Play-by-play is refreshed after each game window, the last at 00:30 Eastern after the night game, and again daily at 05:00 Eastern in season; injury reports, rosters and depth charts more than once a day, in the early morning UTC and again in the afternoon (all three around 16:30 UTC on Nov 18, 2026), so a Friday report is on the board by Saturday's build. Lines for the next week go briefly blank after Monday night (Tuesday 03:30–06:45 UTC in 2025). The daily build at 08:50 UTC (off the hour, where GitHub delays scheduled runs least) runs after the night refresh and the odds gap, and in winter before the 05:00 Eastern re-pull (10:00 UTC); GitHub can still start it hours late or skip a day, and pushes rebuild too. It's a volunteer project with no SLA; a failed sanity check stops the deploy and the last good site stays up.
-- **nflverse gaps we've seen.** The schedule's starting-QB columns are the pre-game listing and often stay that way after the game (57 games 2022–2026 list a QB who didn't start). The depth chart is slow on injuries: a hurt starter stays QB1 for days (Maye, Nov 2026). Weather and referee are filled in only after a game. Rows for a new playoff round arrive over about 12 hours after the matchups are set. Each build logs a data-health record (also in `manifest.json`): what triggered it, missing files, played games whose plays aren't in yet, teams without an injury report, and how the QB was picked (two names shown, a QB with no dropbacks yet, none, outvoted by the listing and the depth chart). It changes nothing on the board; it's the record for deciding which gap needs handling.
+- **We mirror it.** GitHub release downloads have no CORS headers, so the browser can't read them; the pipeline writes slim parquet and JSON files into the site.
+- **When nflverse updates.** Play-by-play after each game window (the last at 00:30 Eastern, after the night game) and daily at 05:00 Eastern in season. Injury reports, rosters and depth charts more than once a day, early morning and afternoon UTC. Next week's lines go briefly blank after Monday night (Tuesday 03:30–06:45 UTC in 2025). nflverse is a volunteer project with no SLA.
+- **Gaps we've seen.** The schedule's starting-QB columns stay the pre-game listing after the game (57 games 2022–2026 list a QB who didn't start). The depth chart is slow on injuries: a hurt starter stays QB1 for days (Maye, Nov 2026). Weather and referee are filled in only after a game. A new playoff round's rows arrive over about 12 hours. Participation (personnel, formation, coverage, routes, pressure) comes only after the season; coverage and targeted route exist only on dropbacks (~99% from 2023, ~89% in 2022).
 
 ## Architecture
 
 ```
 GitHub Action (every push, daily 08:50 UTC)
   └─ pipeline/build.py (Python + DuckDB)
-       download, join pbp ⟷ participation ⟷ FTN per play, derive columns
-       write static/data/plays_{season}.parquet, teams.json, games.json, matchups.json, manifest.json
+       plays:     join pbp ⟷ participation ⟷ FTN per play, derive columns
+                  → plays_{season}.parquet, fourth_{season}.parquet
+       Game day:  matchup.py, from this season's plays plus schedules, rosters,
+                  injuries, snap counts and depth charts → matchups.json
+       also:      teams.json, games.json, manifest.json (with the data-health record)
        sanity checks (join rates, play counts) → fail the build if off
   └─ vite build → GitHub Pages
 
 Browser
-  ├─ DC/OC helpers: DuckDB-WASM queries the parquet files; filters live in the URL
-  └─ Game day: reads the precomputed matchups.json, no DuckDB
+  ├─ Game day: reads the precomputed matchups.json, no DuckDB
+  └─ DC/OC helpers: DuckDB-WASM queries the parquet files; filters live in the URL
 ```
 
-There is no server: queries run in the visitor's browser, so the build costs the same for one user or many. Finished seasons' nflverse files are cached between builds.
-
-Derived columns (personnel grouping, defensive package, distance bucket, field zone, score state …) are DuckDB macros in `pipeline/derive.py`, computed once so the frontend SQL stays simple.
-
-## DC and OC helpers
-
-Where Game day is the 30-second view, the helpers dig down: the DC helper scouts an offense (situational tendencies, personnel and formation, run game, pass game, tells), the OC helper a defense (packages against your personnel, coverage, pressure, what works against them).
-
-**Everything against the league, under the same filters.** A number alone means little; every one is shown next to the league's in the same situation (play-weighted) and ranked among all teams under the same filters. The filters (seasons, regular season or playoffs, downs, distance, field zone, score, two-minute, home/away, last 4 or 8 games) apply to the league too, so "3rd & 3–6 in the red zone" compares like with like. "Last 4 games" keeps each team's own last four, not the scouted team's dates. Filters live in the URL, so every view is a shareable link.
-
-**Two seasons by default.** The current season has no participation data (personnel, formation, coverage, routes, pressure) until nflverse publishes it after the season; with last season selected too, those sections fill from it and say so. Pistol is split out from shotgun only when every selected season has formation data; otherwise the two are shown together.
-
-**Tells** are situation combinations (personnel, alignment, down, distance, field zone, in the pairs and triples a coordinator would call out) where an offense's run/pass mix departs from the league's in the same combination. A team's rate is pulled toward the league by 90 plays' worth of league average before comparing: fitted by `pipeline/tells_backtest.py` (tells picked from weeks 1–9, checked on weeks 10–18), unshrunk tells kept only 32–44% of their gap in the second half (2023–2025), shrunk ones 79–105%. A tell needs 12 plays and a 5-point gap after shrinking; they're ranked by that expected gap, so a big sample with a moderate gap beats a tiny extreme one, up to eight are shown, and the same tell said twice ("1st down" and "1st & 7–10", same direction) is shown once. Rerun the backtest once a season is complete (`npm run data:backtest`).
-
-**Colors** are from the point of view the section serves: tendencies above or below the league in orange and blue, the pressure profile from the defense's side, "What works against them" from your offense's (green: it works).
+- **No server.** Queries run in the visitor's browser, so the build costs the same for one user or many. Finished seasons' play files (play-by-play, participation, FTN) are cached between builds.
+- **Derived columns** (personnel grouping, defensive package, distance bucket, field zone, score state …) are DuckDB macros in `pipeline/derive.py`, computed once so the frontend SQL stays simple.
+- **Build timing.** 08:50 UTC: after the night play-by-play and the Tuesday odds gap, before the winter 05:00 Eastern re-pull (10:00 UTC), and away from the top of the hour, where GitHub delays scheduled runs most. GitHub can still start it hours late or skip a day, and pushes rebuild too; the corner of every page shows when the data was built. A failed sanity check stops the deploy and the last good site stays up.
+- **Data-health record.** Each build logs, also into `manifest.json`: what triggered it, missing files, played games whose plays aren't in yet, teams without an injury report, and how the QB was picked (two names, no dropbacks yet, none, outvoted by the listing and the depth chart). It changes nothing on the board; it's the record for deciding which nflverse gap needs handling.
 
 ## Game day
 
@@ -100,3 +91,18 @@ The numbers rebuild each source as the 08:50 UTC build would have seen it: the l
 - **Before the final report** (the day before kickoff: Friday for Sunday games), nobody has a game status, so players show "Missed last game", "Did not practice" or "Limited in practice". Together these catch 79% of the players who end up inactive; missed last game alone is a coin flip (52%). The report counts as out once any player on the team has a status, or the day before kickoff. Once a game is played, only "Out" is kept.
 - **Records, points and ranks** are the regular season's, so a playoff team isn't 13-5. Neutral sites read "vs.", not "at".
 - **Early season** (weeks 1–3): little usage yet, so few labels, and the board says so. Falling back to last season's usage was left out: too big for what it buys.
+
+## DC and OC helpers
+
+The dig-down behind Game day: the DC helper scouts an offense (situational tendencies, personnel and formation, run game, pass game, tells), the OC helper a defense (packages against your personnel, coverage, pressure, what works against them).
+
+- **Against the league, under the same filters.** Every number sits next to the league's in the same situation (play-weighted) and is ranked among all teams. The filters (seasons, regular season or playoffs, down, distance, field zone, score, two-minute, home/away, last 4 or 8 games) apply to the league too; "last 4 games" is each team's own last four. Filters live in the URL, so every view is a shareable link.
+- **Two seasons by default**, so last season's participation data fills personnel, formation and coverage while the current season has none, and the section says so. Pistol is split from shotgun only when every selected season has formation data.
+- **Colors** take the point of view the section serves: tendencies above or below the league in orange and blue, the pressure profile from the defense's side, "What works against them" from your offense's (green: it works).
+
+**Tells** are situation combinations where an offense's run/pass mix departs from the league's:
+
+- Combinations of personnel, alignment, down, distance and field zone, in the pairs and triples a coordinator would call out.
+- A team's rate is pulled toward the league by 90 plays' worth of league average. Fitted by `pipeline/tells_backtest.py` (picked from weeks 1–9, checked on weeks 10–18): unpulled tells kept 32–44% of their gap, pulled ones 79–105% (2023–2025).
+- A tell needs 12 plays and a 5-point gap after pulling; they're ranked by that gap, up to eight show, and the same tell said twice ("1st down" and "1st & 7–10", same direction) shows once.
+- Rerun the backtest once a season is complete (`npm run data:backtest`).
