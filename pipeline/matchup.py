@@ -572,7 +572,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         last_reg = max(g["week"] for g in sched if g["game_type"] == "REG")
         for t, wk in list(last_week.items()):
             qbs = stats.get((week, t), {}).get("qbs", {})
-            lead = max(qbs, key=lambda p: qbs[p]["dropbacks"], default=None)
+            lead = max(qbs, key=lambda p: (qbs[p]["dropbacks"], p), default=None)
             if wk == last_reg and lead and game_qb.get((t, wk)) != lead and (lead, wk) not in ruled_out:
                 last_week[t] = max((g["week"] for g in sched if g["week"] < wk and t in (g["home_team"], g["away_team"])),
                                    default=None)
@@ -641,6 +641,8 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         before = prev.get((team, group, pid), [])
         return now, [l for l in now if l not in before]
 
+    # Every sort below ends on the player id: DuckDB returns rows in no fixed order, so exact ties
+    # would otherwise reshuffle the board between rebuilds with the same data.
     def by_share(st: Dict) -> Tuple[float, float]:
         """Sort key for targets: share over the games he was active for, once there's a sample;
         raw count otherwise. A receiver back from injury or newly traded isn't buried under season totals."""
@@ -657,7 +659,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         # "Back" waits for the final report: before it, not ruled out only means no status yet
         # (2022-2026 midweek, the rule was right 28% of the time; after the report, 48%).
         qbs = s["qbs"]
-        cands = [pid for pid in sorted(qbs, key=lambda p: -qbs[p]["dropbacks"]) if not unavailable(pid, team)]
+        cands = [pid for pid in sorted(qbs, key=lambda p: (-qbs[p]["dropbacks"], p)) if not unavailable(pid, team)]
         last = last_qb.get(team)
         back = [pid for pid in cands if pid in recently_out and pid != last and qbs[pid]["dropbacks"] >= 60
                 and team not in pending and was_starter(pid, team)]
@@ -696,7 +698,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
                   "alt": {k: alt[k] for k in ("id", "name", "jersey", "why")} if alt else None}
 
         targets = []
-        for pid in sorted(s["targets"], key=lambda p: by_share(s["targets"][p])):
+        for pid in sorted(s["targets"], key=lambda p: (*by_share(s["targets"][p]), p)):
             st = s["targets"][pid]
             if unavailable(pid, team) or positions.get(pid) not in ("WR", "TE", "RB", "FB"):
                 continue
@@ -712,7 +714,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
                 t["new"] = [l for l in t["new"] if l != "go_to"]
 
         backs = []
-        for pid in sorted(s["backs"], key=lambda p: -s["backs"][p]["carries"]):
+        for pid in sorted(s["backs"], key=lambda p: (-s["backs"][p]["carries"], p)):
             if unavailable(pid, team):
                 continue
             now, new = labels(team, "backs", pid)
@@ -749,7 +751,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
                     item["next"] = {"name": backs[0]["name"], "share": backs[0]["stats"]["rb_share"]}
             out.append(item)
         # By impact, not status: the QB first, then usual share of the snaps.
-        out.sort(key=lambda i: ((i["dropbacks"] or 0) < 30, -(snaps.get(i["id"]) or 0), OUT_ORDER.get(i["status"], 9)))
+        out.sort(key=lambda i: ((i["dropbacks"] or 0) < 30, -(snaps.get(i["id"]) or 0), OUT_ORDER.get(i["status"], 9), i["id"]))
 
         # This team's defense: its regulars who are out, by usual snap share. "New": he played the last game.
         def_out = []
@@ -771,7 +773,7 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
                             "status": status, "injury": (rep or {}).get("report_primary_injury"),
                             "snap_share": reg["share"], "last_played": {"season": reg["season"], "week": reg["week"]},
                             "new": played_last and status in MISSING})
-        def_out.sort(key=lambda i: (-i["snap_share"], OUT_ORDER.get(i["status"], 9)))
+        def_out.sort(key=lambda i: (-i["snap_share"], OUT_ORDER.get(i["status"], 9), i["id"]))
 
         return {
             "team": team, "record": rec, "ppg": round(pts, 1), "ppg_rank": ppg_rank.get(team),
