@@ -454,6 +454,93 @@ def defense_regulars(con: duckdb.DuckDBPyConnection, snaps_file: Path, prev_snap
     return regulars
 
 
+def pick_qb(ours: Optional[str], listed: Optional[str], depth: Optional[str],
+            report_out: bool) -> Tuple[Optional[str], Optional[Tuple[str, str]]]:
+    """The board's QB and a dissenting second name with its source ("recent", "listed", "depth").
+    Three opinions, each already None if unavailable: our rule, nflverse's listed starter, QB1 on
+    the depth chart. After the final report: the one two agree on, else the depth chart's (replayed
+    2025/2026: 99.1%/98.7% right, ours alone 96.7%/96.0%). Before it, ours: the listing and the
+    depth chart lag behind injuries (a hurt starter stays QB1)."""
+    if report_out:
+        votes = [v for v in (ours, listed, depth) if v]
+        first = next((v for v in votes if votes.count(v) >= 2), None) or depth or ours or listed
+        others = [(ours, "recent"), (listed, "listed"), (depth, "depth")]
+    else:
+        first = ours or listed or depth
+        others = [(listed, "listed")]
+    second = next(((pid, why) for pid, why in others if pid and pid != first), None)
+    return first, second
+
+
+def _status(inj: Optional[Dict]) -> str:
+    """This week's game status; a player not on the report but on injured reserve is "Injured reserve"."""
+    return inj["report_status"] if inj else "Injured reserve"
+
+
+def offense_out(team: str, candidates: Set[str], roster: Dict[str, Dict], injuries: Dict[str, Dict],
+                s: Dict, snaps: Dict[str, float], last_played: Dict[str, int], last_wk: Optional[int],
+                held: Dict, targets: List[Dict], backs: List[Dict], person: Callable[[str], Dict]) -> List[Dict]:
+    """The offense's players who are out and mattered: a real share of the targets or carries,
+    a QB's dropbacks, or a big share of the snaps (blockers). By impact: the QB first, then usual
+    snap share. "New": he played the last game."""
+    out = []
+    for pid in candidates:
+        r = roster.get(pid) or {}
+        inj = injuries.get(pid)
+        if (inj and inj["team"] != team) or (not inj and r.get("team") != team):
+            continue
+        t, b, q = s["targets"].get(pid), s["backs"].get(pid), s["qbs"].get(pid)
+        share = max(t["share"] if t else 0, b["rb_share"] if b else 0)
+        snap = snaps.get(pid, 0.0)
+        qb_role = bool(q and q["dropbacks"] >= 30)
+        by_snaps = not qb_role and share < OUT_TOUCH_BAR and snap >= OUT_SNAP_BAR
+        if not qb_role and share < OUT_TOUCH_BAR and not by_snaps:
+            continue
+        item = {**person(pid), "status": _status(inj),
+                "target_share": t["share"] if t else None, "carry_share": b["rb_share"] if b else None,
+                "dropbacks": q["dropbacks"] if q else None,
+                "snap_share": snap or None, "by_snaps": by_snaps,
+                "new": last_played.get(pid) == last_wk and _status(inj) in MISSING,
+                "labels": [l for g in ("qbs", "targets", "backs") for l in held.get((team, g, pid), [])]}
+        # Who's next in line for an absent go-to guy or workhorse.
+        if item["status"] in ("Out", "Injured reserve"):
+            if t and "go_to" in item["labels"] and targets:
+                item["next"] = {"name": targets[0]["name"], "share": targets[0]["stats"]["share"]}
+            elif b and "workhorse" in item["labels"] and backs:
+                item["next"] = {"name": backs[0]["name"], "share": backs[0]["stats"]["rb_share"]}
+        out.append(item)
+    out.sort(key=lambda i: ((i["dropbacks"] or 0) < 30, -(snaps.get(i["id"]) or 0), OUT_ORDER.get(i["status"], 9), i["id"]))
+    return out
+
+
+def defense_out(team: str, season: int, regulars: Dict[Tuple[str, str], Dict], defense: Dict[str, Dict],
+                report: Dict[str, Dict], pending: bool, missed: Set[Tuple[str, int]], last_wk: Optional[int],
+                person: Callable[[str], Dict]) -> List[Dict]:
+    """The defense's regulars who are out (on the report, on injured reserve, or before the report
+    missed the last game), by usual snap share. "New": he played the last game."""
+    out = []
+    for (pid, reg_team), reg in regulars.items():
+        r = defense.get(pid)
+        if reg_team != team or not r or r.get("team") != team:
+            continue
+        rep = report.get(pid)
+        if rep:
+            status = rep["report_status"]
+        elif r.get("status") == "RES":
+            status = "Injured reserve"
+        elif pending and (pid, last_wk) in missed:
+            status = "Missed last game"
+        else:
+            continue
+        played_last = reg["season"] == season and reg["week"] == last_wk
+        out.append({**person(pid), "pos": r.get("depth_chart_position") or r.get("position"),  # CB, not DB
+                    "status": status, "injury": (rep or {}).get("report_primary_injury"),
+                    "snap_share": reg["share"], "last_played": {"season": reg["season"], "week": reg["week"]},
+                    "new": played_last and status in MISSING})
+    out.sort(key=lambda i: (-i["snap_share"], OUT_ORDER.get(i["status"], 9), i["id"]))
+    return out
+
+
 def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
           games_file: Path, roster_file: Optional[Path], injuries_file: Optional[Path],
           today: Optional[date] = None, snaps_file: Optional[Path] = None,
@@ -625,9 +712,6 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             "missed_last": early and (pid, last_week.get(team)) in missed,
         }
 
-    def status_now(inj: Optional[Dict]) -> str:
-        return inj["report_status"] if inj else "Injured reserve"
-
     def unavailable(pid: str, team: str) -> bool:
         """Not on the team's active roster any more (cut, traded, injured reserve) or ruled out."""
         r = roster.get(pid)
@@ -669,27 +753,14 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
             starter = last
         else:
             starter = cands[0] if cands else None
-        # Two more opinions: nflverse's listed starter and the depth chart's QB1, each skipped if
-        # he's unavailable. After the final report the first name is the one two of the three agree
-        # on, else the depth chart's: replayed against the QB who threw the first pass, right
-        # 98.6% (2025) and 98.3% (2026) of the time, ours alone 96.7% and 96.0%. Before the report,
-        # the listing and the depth chart lag behind injuries (a hurt starter stays QB1), so ours
-        # stays first: 94.4% and 93.3%, the vote 90.7% and 90.3%. The other name is shown too.
+        # Two more opinions, then the vote (see pick_qb).
         if listed and unavailable(listed, team):
             listed = None
         depth = next((pid for pid in depth_qbs.get(team, []) if not unavailable(pid, team)), None)
-        ours = starter
-        if team not in pending:
-            votes = [v for v in (ours, listed, depth) if v]
-            starter = next((v for v in votes if votes.count(v) >= 2), None) or depth or ours or listed
-            others = [(ours, "recent"), (listed, "listed"), (depth, "depth")]
-        else:
-            starter = ours or listed or depth
-            others = [(listed, "listed")]
+        starter, pick = pick_qb(starter, listed, depth, team not in pending)
         qb = None
         if starter:
             now, new = labels(team, "qbs", starter)
-            pick = next(((pid, why) for pid, why in others if pid and pid != starter), None)
             alt = {**person(pick[0]), "why": pick[1]} if pick else None
             qb = {**person(starter), "stats": qbs.get(starter, NO_QB_STATS), "labels": now, "new": new,
                   "changed": last is not None and starter != last,
@@ -723,57 +794,12 @@ def build(con: duckdb.DuckDBPyConnection, out_dir: Path, season: int,
         backs = [b for i, b in enumerate(backs) if i < 2 or b["labels"]][:3]
         backfield = "workhorse" if backs and "workhorse" in backs[0]["labels"] else "committee" if top_share < 0.5 else "lead"
 
-        # Who's out: injury report plus injured reserve, for players who matter.
-        out = []
-        for pid in set(injuries) | {p for p, r in roster.items() if r.get("status") == "RES"}:
-            r = roster.get(pid) or {}
-            inj = injuries.get(pid)
-            if (inj and inj["team"] != team) or (not inj and r.get("team") != team):
-                continue
-            t, b, q = s["targets"].get(pid), s["backs"].get(pid), s["qbs"].get(pid)
-            share = max(t["share"] if t else 0, b["rb_share"] if b else 0)
-            snap = snaps.get(pid, 0.0)
-            qb_role = bool(q and q["dropbacks"] >= 30)
-            by_snaps = not qb_role and share < OUT_TOUCH_BAR and snap >= OUT_SNAP_BAR
-            if not qb_role and share < OUT_TOUCH_BAR and not by_snaps:
-                continue
-            item = {**person(pid), "status": status_now(inj),
-                    "target_share": t["share"] if t else None, "carry_share": b["rb_share"] if b else None,
-                    "dropbacks": q["dropbacks"] if q else None,
-                    "snap_share": snap or None, "by_snaps": by_snaps,
-                    "new": last_played.get(pid) == last_week.get(team) and status_now(inj) in MISSING,
-                    "labels": [l for g in ("qbs", "targets", "backs") for l in held.get((team, g, pid), [])]}
-            # Who's next in line for an absent go-to guy or workhorse.
-            if item["status"] in ("Out", "Injured reserve"):
-                if t and "go_to" in item["labels"] and targets:
-                    item["next"] = {"name": targets[0]["name"], "share": targets[0]["stats"]["share"]}
-                elif b and "workhorse" in item["labels"] and backs:
-                    item["next"] = {"name": backs[0]["name"], "share": backs[0]["stats"]["rb_share"]}
-            out.append(item)
-        # By impact, not status: the QB first, then usual share of the snaps.
-        out.sort(key=lambda i: ((i["dropbacks"] or 0) < 30, -(snaps.get(i["id"]) or 0), OUT_ORDER.get(i["status"], 9), i["id"]))
-
-        # This team's defense: its regulars who are out, by usual snap share. "New": he played the last game.
-        def_out = []
-        for (pid, reg_team), reg in regulars.items():
-            r = defense.get(pid)
-            if reg_team != team or not r or r.get("team") != team:
-                continue
-            rep = def_report.get(pid)
-            if rep:
-                status = rep["report_status"]
-            elif r.get("status") == "RES":
-                status = "Injured reserve"
-            elif team in pending and (pid, last_week.get(team)) in missed:
-                status = "Missed last game"
-            else:
-                continue
-            played_last = reg["season"] == season and reg["week"] == last_week.get(team)
-            def_out.append({**person(pid), "pos": r.get("depth_chart_position") or r.get("position"),  # CB, not DB
-                            "status": status, "injury": (rep or {}).get("report_primary_injury"),
-                            "snap_share": reg["share"], "last_played": {"season": reg["season"], "week": reg["week"]},
-                            "new": played_last and status in MISSING})
-        def_out.sort(key=lambda i: (-i["snap_share"], OUT_ORDER.get(i["status"], 9), i["id"]))
+        # Who's out, offense and defense (shown per team, below the boards).
+        candidates = set(injuries) | {p for p, r in roster.items() if r.get("status") == "RES"}
+        out = offense_out(team, candidates, roster, injuries, s, snaps, last_played, last_week.get(team),
+                          held, targets, backs, person)
+        def_out = defense_out(team, season, regulars, defense, def_report, team in pending, missed,
+                              last_week.get(team), person)
 
         return {
             "team": team, "record": rec, "ppg": round(pts, 1), "ppg_rank": ppg_rank.get(team),

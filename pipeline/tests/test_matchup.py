@@ -10,9 +10,12 @@ from matchup import (
     QB_RULES,
     TARGET_RULES,
     apply_rules,
+    defense_out,
     defense_regulars,
     implied_scores,
+    offense_out,
     on_the_rise,
+    pick_qb,
     player_stats,
     practice,
     record,
@@ -183,3 +186,67 @@ def test_defense_regulars_count_snaps_for_the_team_only(tmp_path):
     # D: too few games last season. E: a regular for Atlanta, not yet for Jacksonville. F: one game.
     assert set(regs) == {("A", "DET"), ("C", "GB"), ("E", "ATL")}
     assert regs[("C", "GB")]["season"] == 2025
+
+
+@pytest.mark.parametrize("ours, listed, depth, report_out, first, second", [
+    # After the final report: two of three agree.
+    ("A", "B", "B", True, "B", ("A", "recent")),   # the listing and the depth chart outvote us
+    ("A", "A", "B", True, "A", ("B", "depth")),
+    ("A", "A", "A", True, "A", None),
+    ("A", "B", "C", True, "C", ("A", "recent")),   # no two agree: the depth chart's
+    ("A", None, "B", True, "B", ("A", "recent")),
+    (None, None, "C", True, "C", None),            # fills a blank (a QB without dropbacks)
+    # Before the report: ours, with the listing as the second name; the depth chart only fills blanks.
+    ("A", "B", "C", False, "A", ("B", "listed")),
+    ("A", None, "C", False, "A", None),
+    (None, "B", "C", False, "B", None),
+    (None, None, "C", False, "C", None),
+    (None, None, None, True, None, None),
+])
+def test_pick_qb(ours, listed, depth, report_out, first, second):
+    assert pick_qb(ours, listed, depth, report_out) == (first, second)
+
+
+def person(pid):
+    return {"id": pid, "name": pid}
+
+
+def test_defense_out_statuses_new_and_order():
+    regs = {(p, "DET"): {"share": sh, "season": 2026, "week": wk, "team": "DET"}
+            for p, sh, wk in [("out", 0.9, 8), ("hurt_last", 0.8, 10), ("ir", 0.95, 2), ("missed", 0.7, 9), ("fine", 0.9, 10)]}
+    regs[("traded", "ATL")] = {"share": 0.9, "season": 2026, "week": 9, "team": "ATL"}
+    defense = {p: {"team": "DET", "status": "ACT", "position": "DB"} for p in ("out", "hurt_last", "missed", "fine")}
+    defense["ir"] = {"team": "DET", "status": "RES", "position": "LB", "depth_chart_position": "MLB"}
+    defense["traded"] = {"team": "DET", "status": "ACT", "position": "DB"}
+    report = {"out": {"report_status": "Out", "report_primary_injury": "Hip"},
+              "hurt_last": {"report_status": "Doubtful", "report_primary_injury": "Knee"}}
+    missed = {("missed", 10), ("traded", 10)}
+    kw = dict(team="DET", season=2026, regulars=regs, defense=defense, report=report, missed=missed,
+              last_wk=10, person=person)
+    pending = defense_out(pending=True, **kw)
+    assert [(o["id"], o["status"], o["new"]) for o in pending] == [
+        ("ir", "Injured reserve", False), ("out", "Out", False),
+        ("hurt_last", "Doubtful", True), ("missed", "Missed last game", False)]
+    assert pending[0]["pos"] == "MLB"  # depth-chart position, finer than the roster's
+    # After the report, "missed last game" no longer stands in for a status; a traded-in
+    # defender is never Detroit's regular on Atlanta's snaps.
+    assert [o["id"] for o in defense_out(pending=False, **kw)] == ["ir", "out", "hurt_last"]
+
+
+def test_offense_out_who_matters_and_order():
+    s = {"targets": {"wr1": {"share": 0.27}, "te2": {"share": 0.05}, "wr5": {"share": 0.03}},
+         "backs": {}, "qbs": {"qb": {"dropbacks": 300}}}
+    roster = {p: {"team": "CHI", "status": "ACT"} for p in ("wr1", "te2", "wr5", "qb")}
+    roster["te2"]["status"] = "RES"
+    injuries = {"wr1": {"team": "CHI", "report_status": "Out"}, "wr5": {"team": "CHI", "report_status": "Out"},
+                "qb": {"team": "CHI", "report_status": "Questionable"}}
+    snaps = {"wr1": 0.9, "te2": 0.6, "wr5": 0.2, "qb": 0.5}
+    held = {("CHI", "targets", "wr1"): ["go_to"]}
+    targets = [{"name": "Odunze", "stats": {"share": 0.18}}]
+    out = offense_out("CHI", {"wr1", "te2", "wr5", "qb"}, roster, injuries, s, snaps, {"wr1": 10}, 10,
+                      held, targets, [], person)
+    # wr5 doesn't matter (3% of the targets, 20% of the snaps); the questionable QB leads; te2 by snaps.
+    assert [(o["id"], o["status"]) for o in out] == [("qb", "Questionable"), ("wr1", "Out"), ("te2", "Injured reserve")]
+    wr1, te2 = out[1], out[2]
+    assert wr1["new"] and wr1["next"] == {"name": "Odunze", "share": 0.18}
+    assert te2["by_snaps"] and not te2["new"]
