@@ -76,7 +76,7 @@ The numbers rebuild each source as the 08:50 UTC build would have seen it: the l
 
 ### Who's out
 
-**Per team, below both boards**, offense and defense together under the team's color: viewers think in teams, not possessions. Offensive linemen aren't covered, and the page says so: their snap counts don't join (see Data), and an honest gap beats a fragile name match.
+**Per team, below both boards**, defense and offense together under the team's color: viewers think in teams, not possessions. Defense first: it shows nowhere else, while the offense's absences partly show on the boards. Offensive linemen aren't covered, and the page says so: their snap counts don't join (see Data), and an honest gap beats a fragile name match.
 
 - **Offense:** players with 8%+ of the targets or carries, or 40%+ of the offensive snaps (blocking tight ends barely show in touches). Without a snap this season, a regular for this team last season (half the snaps, four games) still shows, as on defense.
 - **Defense:** regulars, at half the defensive snaps in the games they played for this team, over two games (one if the team has played only one). Without a snap this season, last season's share with the same team counts, so a star out since last year (Parsons) still shows; a defender traded in isn't a regular until he's played for his new team.

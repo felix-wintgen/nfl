@@ -4,8 +4,9 @@
 	import type { Team } from '#lib/meta.ts';
 	import Tag from './Tag.svelte';
 
-	// Who's out for one team, offense and defense together: viewers think in teams, not
+	// Who's out for one team, defense and offense together: viewers think in teams, not
 	// possessions, so a banged-up team's story sits in one place under its own color.
+	// Defense first: the offense's absences partly show on the boards already, the defense's nowhere else.
 	let { board, team, season }: { board: Board; team: Team; season: number } = $props();
 
 	const defense = $derived(board.def_out ?? []);
@@ -19,20 +20,6 @@
 	</h2>
 	{#if line}<p class="line">{line}</p>{/if}
 
-	{#if board.out.length}
-		<h3>Offense</h3>
-		<ul class="out">
-			{#each board.out as o (o.id)}
-				<li>
-					<Tag key={statusKey(o.status)} text={o.status} tone="warn" fresh={o.new} />
-					<strong>#{o.jersey ?? '–'} {o.name}</strong>
-					<span class="pos">{o.pos}</span>
-					<span class="muted">{outLine(o)}</span>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-
 	{#if defense.length}
 		<h3>Defense</h3>
 		<ul class="out">
@@ -42,6 +29,20 @@
 					<strong>#{o.jersey ?? '–'} {o.name}</strong>
 					<span class="pos">{o.pos}</span>
 					<span class="muted">{defOutLine(o, season)}</span>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	{#if board.out.length}
+		<h3>Offense</h3>
+		<ul class="out">
+			{#each board.out as o (o.id)}
+				<li>
+					<Tag key={statusKey(o.status)} text={o.status} tone="warn" fresh={o.new} />
+					<strong>#{o.jersey ?? '–'} {o.name}</strong>
+					<span class="pos">{o.pos}</span>
+					<span class="muted">{outLine(o)}</span>
 				</li>
 			{/each}
 		</ul>
