@@ -261,3 +261,14 @@ def test_offense_out_falls_back_to_last_season():
     assert [(o["id"], o["status"], o["snap_share"], o["last_season"]) for o in out] == [("rb", "Injured reserve", 0.5, True)]
     # A snap this season means this season decides: no fallback.
     assert offense_out("ARI", {"rb"}, roster, {}, s, {"rb": 0.1}, {}, 10, {}, [], [], person, last) == []
+
+
+def test_offense_out_lists_missed_last_game_before_the_report():
+    s = {"targets": {}, "backs": {"rb2": {"rb_share": 0.45}}, "qbs": {}}
+    roster = {"rb2": {"team": "CHI", "status": "ACT"}}
+    args = ("CHI", {"rb2"}, roster, {}, s, {}, {}, 9, {}, [], [], person, {})
+    # Before the final report, a back who missed the last game is "in doubt", as on defense.
+    out = offense_out(*args, pending=True, missed={("rb2", 9)})
+    assert [(o["id"], o["status"], o["new"]) for o in out] == [("rb2", "Missed last game", False)]
+    # After it, his game status (or none) decides.
+    assert offense_out(*args, pending=False, missed={("rb2", 9)}) == []
