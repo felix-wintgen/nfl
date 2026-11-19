@@ -105,4 +105,5 @@ The dig-down behind Game day: the DC helper scouts an offense (situational tende
 - Combinations of personnel, alignment, down, distance and field zone, in the pairs and triples a coordinator would call out.
 - A team's rate is pulled toward the league by 90 plays' worth of league average. Fitted by `pipeline/tells_backtest.py` (picked from weeks 1–9, checked on weeks 10–18): unpulled tells kept 32–44% of their gap, pulled ones 79–105% (2023–2025).
 - A tell needs 12 plays and a 5-point gap after pulling; they're ranked by that gap, up to eight show, and the same tell said twice ("1st down" and "1st & 7–10", same direction) shows once.
+- That's half a season predicting the next half. On the default view (last season plus this one) predicting the next four weeks, tells kept their direction 61–79% of the time (2023–2025); the low was Weeks 5–8 of 2025, when last season's habits misled; fitting the pull on earlier seasons only changes nothing. In 2026, with no participation data yet, personnel tells come from 2025 alone.
 - Rerun the backtest once a season is complete (`npm run data:backtest`).
