@@ -32,8 +32,11 @@ export const SETS: Dim[][] = [
 
 export interface Tell {
 	dims: Partial<Record<Dim, string>>;
+	/** Weighted plays (earlier seasons count PRIOR_WEIGHT): what the shrinkage sees. */
 	n: number;
-	/** The team's raw pass rate in this situation. */
+	/** Plays behind it, unweighted, for display. */
+	plays: number;
+	/** The team's raw pass rate in this situation: every play counted once, for display. */
 	passRate: number;
 	/** The raw rate pulled toward the league: what to expect next time. */
 	expected: number;
@@ -48,6 +51,14 @@ export const MIN_PLAYS = 12;
  * kept only 32-45% of their gap in the second half; with it, 81-101%.
  */
 export const SHRINK_PLAYS = 90;
+/**
+ * Plays from seasons before the latest selected one count this much. Habits drift and
+ * coaches change: with last season at full weight, tells from last season plus this one
+ * kept their direction over the next four weeks 74% of the time (slope 0.84); at half, 77%
+ * (slope 0.99), better in 8 of 9 windows, 2023-2025. Any weight from 1/4 to 1/2 beat full;
+ * dropping last season (76%, 0.93) didn't.
+ */
+export const PRIOR_WEIGHT = 0.5;
 /** Minimum gap between the expected rate and the league rate. */
 export const MIN_GAP = 0.05;
 
@@ -59,9 +70,12 @@ export function tellsSql(f: Filters, splitPistol: boolean): string {
 	const expr = dimExpr(splitPistol);
 	const cols = DIMS.map((d) => `${expr[d]}::VARCHAR AS ${d}`).join(', ');
 	const sets = SETS.map((s) => `(${s.join(', ')})`).join(', ');
+	const latest = Math.max(...f.seasons);
+	const weight = `CASE WHEN season = ${latest} THEN 1.0 ELSE ${PRIOR_WEIGHT} END::DOUBLE`;
 	const agg = (w: string[]) => `
-    SELECT GROUPING(${DIMS.join(', ')}) AS gid, ${DIMS.join(', ')}, count(*) AS n, avg(is_pass::INT) AS p
-    FROM (SELECT ${cols}, is_pass FROM plays ${where(w)})
+    SELECT GROUPING(${DIMS.join(', ')}) AS gid, ${DIMS.join(', ')},
+           sum(w) AS n, sum(w * is_pass::INT) / sum(w) AS p, count(*) AS plays, avg(is_pass::INT) AS raw
+    FROM (SELECT ${cols}, is_pass, ${weight} AS w FROM plays ${where(w)})
     GROUP BY GROUPING SETS (${sets})`;
 	const on = DIMS.map((d) => `t.${d} IS NOT DISTINCT FROM l.${d}`).join(' AND ');
 	return `
@@ -74,6 +88,8 @@ WHERE t.n >= ${MIN_PLAYS}`;
 type Row = Record<Dim, string | null> & {
 	gid: number;
 	n: number;
+	plays: number;
+	raw?: number;
 	p: number;
 	ln: number;
 	lp: number;
@@ -95,7 +111,8 @@ export function pickTells(rows: Row[], limit = 8): Tell[] {
 		candidates.push({
 			dims: Object.fromEntries(dims.map((d) => [d, r[d]!])),
 			n: r.n,
-			passRate: r.p,
+			plays: Number(r.plays),
+			passRate: r.raw ?? r.p,
 			expected,
 			leaguePassRate: r.lp
 		});

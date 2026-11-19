@@ -1,7 +1,8 @@
 import { describe as group, expect, it, vi } from 'vitest';
 
 vi.mock('./db', () => ({ ensureSeasons: vi.fn(), query: vi.fn() }));
-const { describe, dimsOf, pickTells, shrink, SHRINK_PLAYS, tellsSql } = await import('./tells.ts');
+const { describe, dimsOf, pickTells, PRIOR_WEIGHT, shrink, SHRINK_PLAYS, tellsSql } =
+	await import('./tells.ts');
 const { defaultFilters } = await import('./filters.ts');
 
 // gid bits (pers, align, down, dist, zone): 1 = not grouped.
@@ -20,6 +21,7 @@ const row = (
 	zone: null,
 	...dims,
 	n,
+	plays: Math.round(n),
 	p,
 	ln: 1000,
 	lp
@@ -107,6 +109,17 @@ group('tellsSql', () => {
 		expect(sql).toContain("posteam = 'KC'");
 		expect(sql).toContain("posteam <> 'KC'"); // the league part: the other teams
 		expect(sql).toContain('t.gid = l.gid');
+	});
+
+	it('counts earlier seasons at PRIOR_WEIGHT, the latest selected season fully', () => {
+		const sql = tellsSql({ ...defaultFilters([2025, 2026]), team: 'KC' }, true);
+		expect(sql).toContain(`CASE WHEN season = 2026 THEN 1.0 ELSE ${PRIOR_WEIGHT} END`);
+		expect(sql).toContain('sum(w) AS n');
+		expect(sql).toContain('count(*) AS plays');
+		// One season: every play counts fully, as before.
+		expect(tellsSql({ ...defaultFilters([2025]), team: 'KC' }, true)).toContain(
+			'CASE WHEN season = 2025 THEN 1.0'
+		);
 	});
 
 	it('splits pistol from shotgun only when told every season has formation data', () => {

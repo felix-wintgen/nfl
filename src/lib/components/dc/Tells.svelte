@@ -3,7 +3,7 @@
 	import type { Filters } from '#lib/filters.ts';
 	import { pct } from '#lib/format.ts';
 	import { withoutParticipation } from '#lib/meta.ts';
-	import { describe, loadTells, MIN_GAP, SHRINK_PLAYS } from '#lib/tells.ts';
+	import { describe, loadTells, MIN_GAP, PRIOR_WEIGHT, SHRINK_PLAYS } from '#lib/tells.ts';
 	import DataNote from '../DataNote.svelte';
 	import Loader from '../Loader.svelte';
 
@@ -18,7 +18,9 @@
 	<p class="muted">
 		Where their run/pass mix is most predictable compared to the other teams in the same situation.
 		Each rate is blended with {SHRINK_PLAYS} plays at the other teams' rate, so a short streak can't pass
-		for a habit. Shown when at least {Math.round(MIN_GAP * 100)} points from the other teams.
+		for a habit. Plays from earlier seasons count {PRIOR_WEIGHT === 0.5 ? 'half' : PRIOR_WEIGHT}:
+		habits drift and coaches change. Shown when at least {Math.round(MIN_GAP * 100)} points from the other
+		teams.
 	</p>
 	<DataNote seasons={filters.seasons} what="Personnel tells" />
 	<Loader {filters} {load}>
@@ -42,7 +44,7 @@
 							</strong>
 							<span class="muted">
 								league {pct(pass ? t.leaguePassRate : 1 - t.leaguePassRate)} · raw
-								{pct(pass ? t.passRate : 1 - t.passRate)} on n={t.n}
+								{pct(pass ? t.passRate : 1 - t.passRate)} on n={t.plays}
 							</span>
 						</li>
 					{/each}
