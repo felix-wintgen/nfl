@@ -25,6 +25,19 @@ Options: `--seasons 2025 2026` builds only those seasons, and `--refresh` re-dow
 
 `npm run data:backtest -- 2023 2024 2025` checks whether the DC helper's tells hold up: it picks them from weeks 1–9 and compares them with weeks 10–18. It also fits `SHRINK_PLAYS` in `src/lib/tells.ts`; rerun it once a season is complete.
 
+### Replays
+
+`pipeline/replay/` checks Game day and the tells against past weeks, the way a build would have seen them. Outputs go to `pipeline/replay/out/` (ignored by git).
+
+```sh
+pipeline/.venv/bin/python pipeline/replay/board_replay.py pipeline/replay/out/before.json 2025 2026
+# change pipeline/matchup.py, then:
+pipeline/.venv/bin/python pipeline/replay/board_replay.py pipeline/replay/out/after.json 2025 2026
+pipeline/.venv/bin/python pipeline/replay/compare.py pipeline/replay/out/before_full.json pipeline/replay/out/after_full.json
+```
+
+`board_replay.py` replays every week's board (midweek and after the final report) and prints how often the QB was right; `compare.py` says whether two replays are identical, or which board fields changed. For nflverse's listed QB as it stood at the time, clone [nfldata](https://github.com/nflverse/nfldata) (a few GB), run `qb_listing.py` on it and pass `--listing`. `tells_game_day.py` checks the DC helper's tells on its default view (last season plus this one), with the constants from `src/lib/tells.ts`.
+
 ## Game day
 
 `/matchup` is a spotting board for the coming week. Per game: the line, implied score and win chance, and records; for each offense, the starting QB, four targets, the backfield and role labels; below them, who's out for each team. `pipeline/matchup.py` builds `matchups.json`, `src/lib/broadcast.ts` words it. There's no board before the season opener. The rules and the replays behind them: [DESIGN.md](DESIGN.md#game-day).
