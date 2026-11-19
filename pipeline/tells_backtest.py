@@ -1,7 +1,8 @@
 """Backtest the DC helper's tells: do they hold up later in the same season?
 
 Picks each team's tells from weeks 1-9 of a regular season (mirroring
-src/lib/tells.ts), then looks up the same situations in weeks 10-18.
+src/lib/tells.ts: the team against the other teams), then looks up the same
+situations in weeks 10-18.
 Compares the old raw-gap ranking with the shrunk ranking and fits the
 shrinkage strength SHRINK_PLAYS.
 
@@ -44,7 +45,8 @@ agg AS (
     FROM plays
     GROUP BY GROUPING SETS ({sets})
 )
-SELECT t.posteam, t.gid, {tdims}, t.n, t.rate, l.rate AS lrate
+SELECT t.posteam, t.gid, {tdims}, t.n, t.rate,
+       (l.n * l.rate - t.n * t.rate) / nullif(l.n - t.n, 0) AS lrate  -- the other teams
 FROM agg t JOIN agg l
   ON t.gid = l.gid AND l.gt = 1 AND {on}
 WHERE t.gt = 0
@@ -68,6 +70,8 @@ def cells(con: duckdb.DuckDBPyConnection, path: Path, lo: int, hi: int) -> dict:
     for team, gid, *rest in con.execute(sql).fetchall():
         vals = dict(zip(DIMS, rest[:5]))
         n, rate, lrate = rest[5:]
+        if lrate is None:
+            continue  # no other team ran it: nothing to compare with (the app shows no tell either)
         dims = dims_of(gid)
         if any(vals[d] is None for d in dims):
             continue  # missing data, not "all"

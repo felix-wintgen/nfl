@@ -1,8 +1,8 @@
 // "Tells": situation combinations where an offense's run/pass mix departs most
-// from the league in the same combination.
+// from the other teams' in the same combination.
 import { alignment } from './baseline';
 import { ensureSeasons, query } from './db';
-import { situationWhere, teamWhere, where, type Filters } from './filters';
+import { restWhere, teamWhere, where, type Filters } from './filters';
 import { ordinal } from './format';
 
 export const DIMS = ['pers', 'align', 'down', 'dist', 'zone'] as const;
@@ -42,10 +42,10 @@ export interface Tell {
 
 export const MIN_PLAYS = 12;
 /**
- * Shrinkage strength: the team rate is blended with this many league-average
- * plays. Fitted by pipeline/tells_backtest.py (tells from weeks 1-9 predicting
+ * Shrinkage strength: the team rate is blended with this many plays at the other
+ * teams' rate. Fitted by pipeline/tells_backtest.py (tells from weeks 1-9 predicting
  * weeks 10-18): 75, 65 and 90 for 2023-2025. Without it, the 2023-2025 tells
- * kept only 32-44% of their gap in the second half; with it, 79-105%.
+ * kept only 32-45% of their gap in the second half; with it, 81-101%.
  */
 export const SHRINK_PLAYS = 90;
 /** Minimum gap between the expected rate and the league rate. */
@@ -66,7 +66,7 @@ export function tellsSql(f: Filters, splitPistol: boolean): string {
 	const on = DIMS.map((d) => `t.${d} IS NOT DISTINCT FROM l.${d}`).join(' AND ');
 	return `
 WITH t AS (${agg(teamWhere(f, 'offense'))}),
-     l AS (${agg(situationWhere(f, 'offense'))})
+     l AS (${agg(restWhere(f, 'offense'))})
 SELECT t.*, l.n AS ln, l.p AS lp FROM t JOIN l ON t.gid = l.gid AND ${on}
 WHERE t.n >= ${MIN_PLAYS}`;
 }

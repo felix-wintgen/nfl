@@ -96,14 +96,14 @@ The numbers rebuild each source as the 08:50 UTC build would have seen it: the l
 
 The dig-down behind Game day: the DC helper scouts an offense (situational tendencies, personnel and formation, run game, pass game, tells), the OC helper a defense (packages against your personnel, coverage, pressure, what works against them).
 
-- **Against the league, under the same filters.** Every number sits next to the league's in the same situation (play-weighted) and is ranked among all teams. The filters (seasons, regular season or playoffs, down, distance, field zone, score, two-minute, home/away, last 4 or 8 games) apply to the league too; "last 4 games" is each team's own last four. Filters live in the URL, so every view is a shareable link.
+- **Against the rest of the league, under the same filters.** Every number sits next to the other 31 teams' in the same situation (play-weighted), and is ranked among all 32. Counting the team in its own benchmark would pull the benchmark toward it, most where it runs a big share of the plays: its signature looks. The filters (seasons, regular season or playoffs, down, distance, field zone, score, two-minute, home/away, last 4 or 8 games) apply to the league too; "last 4 games" is each team's own last four. Filters live in the URL, so every view is a shareable link.
 - **Two seasons by default**, so last season's participation data fills personnel, formation and coverage while the current season has none, and the section says so. Pistol is split from shotgun only when every selected season has formation data.
 - **Colors** take the point of view the section serves: tendencies above or below the league in orange and blue, the pressure profile from the defense's side, "What works against them" from your offense's (green: it works).
 
-**Tells** are situation combinations where an offense's run/pass mix departs from the league's:
+**Tells** are situation combinations where an offense's run/pass mix departs from the other teams':
 
 - Combinations of personnel, alignment, down, distance and field zone, in the pairs and triples a coordinator would call out.
-- A team's rate is pulled toward the league by 90 plays' worth of league average. Fitted by `pipeline/tells_backtest.py` (picked from weeks 1–9, checked on weeks 10–18): unpulled tells kept 32–44% of their gap, pulled ones 79–105% (2023–2025).
+- A team's rate is pulled toward the other teams' by 90 plays' worth of their rate. Fitted by `pipeline/tells_backtest.py` (picked from weeks 1–9, checked on weeks 10–18): unpulled tells kept 32–45% of their gap, pulled ones 81–101% (2023–2025).
 - A tell needs 12 plays and a 5-point gap after pulling; they're ranked by that gap, up to eight show, and the same tell said twice ("1st down" and "1st & 7–10", same direction) shows once.
-- That's half a season predicting the next half. On the default view (last season plus this one) predicting the next four weeks, tells kept their direction 61–79% of the time (2023–2025); the low was Weeks 5–8 of 2025, when last season's habits misled; fitting the pull on earlier seasons only changes nothing. In 2026, with no participation data yet, personnel tells come from 2025 alone.
+- That's half a season predicting the next half. On the default view (last season plus this one) predicting the next four weeks, tells kept their direction 62–79% of the time (2023–2025); the low was Weeks 5–8 of 2025, when last season's habits misled; fitting the pull on earlier seasons only changes nothing. In 2026, with no participation data yet, personnel tells come from 2025 alone.
 - Rerun the backtest once a season is complete (`npm run data:backtest`).

@@ -105,6 +105,7 @@ group('tellsSql', () => {
 		const sql = tellsSql({ ...defaultFilters([2025]), team: 'KC' }, true);
 		expect(sql.match(/GROUPING SETS/g)).toHaveLength(2);
 		expect(sql).toContain("posteam = 'KC'");
+		expect(sql).toContain("posteam <> 'KC'"); // the league part: the other teams
 		expect(sql).toContain('t.gid = l.gid');
 	});
 

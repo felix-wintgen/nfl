@@ -165,6 +165,16 @@ export function teamWhere(f: Filters, side: Side): string[] {
 	return [`${teamColumn(side)} = ${str(f.team)}`, ...situationWhere(f, side)];
 }
 
+/**
+ * The comparison: the same situation for every other team on the scouted side. Counting the
+ * scouted team in its own benchmark pulls the benchmark toward it, most where it runs a big
+ * share of the plays (its signature looks), so it's left out.
+ */
+export function restWhere(f: Filters, side: Side): string[] {
+	if (!f.team || !TEAM_RE.test(f.team)) throw new Error(`invalid team: ${f.team}`);
+	return [`${teamColumn(side)} <> ${str(f.team)}`, ...situationWhere(f, side)];
+}
+
 export const where = (conds: string[]) => (conds.length ? `WHERE ${conds.join(' AND ')}` : '');
 
 /** One-line summary of the active filters, e.g. for the printed game sheet. */

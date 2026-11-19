@@ -1,13 +1,21 @@
-// Team value vs. league baseline for a set of metrics under the same filters.
+// Team value vs. the other teams ("league") for a set of metrics under the same filters.
 import { ensureSeasons, query } from './db';
-import { situationWhere, teamColumn, teamWhere, where, type Filters, type Side } from './filters';
+import {
+	restWhere,
+	situationWhere,
+	teamColumn,
+	teamWhere,
+	where,
+	type Filters,
+	type Side
+} from './filters';
 
 /** Metric name -> SQL aggregate over `plays` (or `table`). */
 export type Metrics = Record<string, string>;
 
 export interface Compared {
 	value: number | null;
-	/** League value over all plays matching the situation (play-weighted). */
+	/** The other teams' value over the plays matching the situation (play-weighted). */
 	league: number | null;
 	/** 1 = highest value among all teams (ties share the better rank). */
 	rank: number | null;
@@ -15,7 +23,7 @@ export interface Compared {
 	of: number;
 	/** Team plays behind `value`. */
 	n: number;
-	/** League plays behind `league`. */
+	/** The other teams' plays behind `league`. */
 	leagueN: number;
 }
 
@@ -45,10 +53,11 @@ export function baselineSql(
 	const gb = groupBy ? ', grp' : '';
 	const sit = where([...situationWhere(f, side), ...extra]);
 	const team = where([...teamWhere(f, side), ...extra]);
+	const rest = where([...restWhere(f, side), ...extra]);
 	return `
 WITH
   t AS (SELECT 'team' AS scope, ${g}, count(*) AS n, ${cols} FROM ${table} ${team} GROUP BY ALL),
-  l AS (SELECT 'league' AS scope, ${g}, count(*) AS n, ${cols} FROM ${table} ${sit} GROUP BY ALL),
+  l AS (SELECT 'league' AS scope, ${g}, count(*) AS n, ${cols} FROM ${table} ${rest} GROUP BY ALL),
   p AS (SELECT 'per_team' AS scope, ${g}, count(*) AS n, ${cols}, ${teamColumn(side)} AS team
         FROM ${table} ${sit} GROUP BY ${teamColumn(side)}${gb})
 SELECT *, NULL AS team FROM t UNION ALL BY NAME

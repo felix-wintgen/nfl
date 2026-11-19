@@ -16,9 +16,9 @@
 <section class="card view">
 	<h2>Tells</h2>
 	<p class="muted">
-		Where their run/pass mix is most predictable compared to the league in the same situation. Each
-		rate is blended with {SHRINK_PLAYS} league-average plays, so a short streak can't pass for a habit.
-		Shown when at least {Math.round(MIN_GAP * 100)} points from the league.
+		Where their run/pass mix is most predictable compared to the other teams in the same situation.
+		Each rate is blended with {SHRINK_PLAYS} plays at the other teams' rate, so a short streak can't pass
+		for a habit. Shown when at least {Math.round(MIN_GAP * 100)} points from the other teams.
 	</p>
 	<DataNote seasons={filters.seasons} what="Personnel tells" />
 	<Loader {filters} {load}>

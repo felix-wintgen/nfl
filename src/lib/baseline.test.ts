@@ -48,15 +48,17 @@ describe('summarize', () => {
 });
 
 describe('baselineSql', () => {
-	it('scopes the team part by team and the league part by situation only', () => {
+	it('compares the team with the other teams, and ranks it among all of them', () => {
 		const sql = baselineSql(
 			metrics,
 			{ ...defaultFilters([2025]), team: 'KC', downs: [3] },
 			'defense'
 		);
 		expect(sql).toContain("FROM plays WHERE defteam = 'KC' AND season IN (2025) AND down IN (3)");
-		expect(sql).toContain('FROM plays WHERE season IN (2025) AND down IN (3) GROUP BY ALL');
-		expect(sql).toContain('GROUP BY defteam');
+		expect(sql).toContain(
+			"FROM plays WHERE defteam <> 'KC' AND season IN (2025) AND down IN (3) GROUP BY ALL"
+		);
+		expect(sql).toContain('FROM plays WHERE season IN (2025) AND down IN (3) GROUP BY defteam');
 	});
 
 	it('applies the games window to the team, the league and every per-team row', () => {

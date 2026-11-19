@@ -25,7 +25,7 @@
 		side,
 		items,
 		title = 'Identity',
-		subtitle = 'Ranks are among all 32 teams under the same filters.'
+		subtitle = 'Ranks are among all 32 teams under the same filters; league values are the other 31.'
 	}: {
 		filters: Filters;
 		side: Side;

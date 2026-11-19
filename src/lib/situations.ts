@@ -1,6 +1,6 @@
 // Fixed situation rows (overlapping on purpose: "3rd & 3-6" and "red zone" can
 // both contain a play) and the SQL that splits plays by row and category for
-// the scouted team and the league in one pass.
+// the scouted team and the other teams in one pass.
 import { ensureSeasons, query } from './db';
 import { situationWhere, teamWhere, where, type Filters, type Side } from './filters';
 
@@ -26,15 +26,16 @@ WITH b AS (
 )`;
 }
 
-/** Counts per situation and category; `team` false = league (all teams). */
+/** Counts per situation and category: the team's (`tn`) and the other teams' (`ln`). */
 export function mixSql(f: Filters, side: Side, category: string, extra: string[]): string {
 	return `${base(f, side, extra)}
-SELECT sit, (${category})::VARCHAR AS cat, count(*) FILTER (WHERE is_team) AS tn, count(*) AS ln
+SELECT sit, (${category})::VARCHAR AS cat, count(*) FILTER (WHERE is_team) AS tn,
+       count(*) FILTER (WHERE NOT is_team) AS ln
 FROM b WHERE sit IS NOT NULL AND (${category}) IS NOT NULL
 GROUP BY ALL`;
 }
 
-/** Metrics per situation for the team and the league. */
+/** Metrics per situation for the team and for the other teams (`league`). */
 export function metricsSql(
 	f: Filters,
 	side: Side,
@@ -45,9 +46,9 @@ export function metricsSql(
 		.map(([k, e]) => `${e} AS "${k}"`)
 		.join(', ');
 	return `${base(f, side, extra)}
-SELECT sit, GROUPING(is_team) = 1 AS league, is_team, count(*) AS n, ${cols}
+SELECT sit, NOT is_team AS league, is_team, count(*) AS n, ${cols}
 FROM b WHERE sit IS NOT NULL
-GROUP BY GROUPING SETS ((sit, is_team), (sit))`;
+GROUP BY sit, is_team`;
 }
 
 export interface MixRow {
