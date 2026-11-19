@@ -15,6 +15,7 @@ from matchup import (
     implied_scores,
     offense_out,
     on_the_rise,
+    our_starter,
     pick_qb,
     player_stats,
     practice,
@@ -272,3 +273,18 @@ def test_offense_out_lists_missed_last_game_before_the_report():
     assert [(o["id"], o["status"], o["new"]) for o in out] == [("rb2", "Missed last game", False)]
     # After it, his game status (or none) decides.
     assert offense_out(*args, pending=False, missed={("rb2", 9)}) == []
+
+
+def test_our_starter():
+    qbs = {"vet": {"dropbacks": 300}, "backup": {"dropbacks": 80}, "rookie": {"dropbacks": 20}}
+    out = set()
+    pick = lambda last, recently=(), report_out=True, starter=("vet",): our_starter(
+        qbs, last, lambda p: p in out, set(recently), report_out, lambda p: p in starter)
+    assert pick("backup") == "backup"                       # last game's QB
+    assert pick("backup", recently={"vet"}) == "vet"        # the starter is back from being ruled out
+    assert pick("backup", recently={"vet"}, report_out=False) == "backup"  # but only after the final report
+    assert pick("backup", recently={"vet"}, starter=()) == "backup"        # lost the job: not his again
+    out.add("backup")
+    assert pick("backup") == "vet"                          # last game's QB is out: the most-used available
+    out.update({"vet", "rookie"})
+    assert pick("backup") is None
